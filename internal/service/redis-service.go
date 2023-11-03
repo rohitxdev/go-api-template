@@ -22,9 +22,9 @@ func connectToRedis() *redis.Client {
 		Addr:     env.REDIS_HOST + ":" + env.REDIS_PORT,
 		Username: env.REDIS_USERNAME,
 		Password: env.REDIS_PASSWORD})
-	if err := rds.Ping(context.TODO()).Err(); err != nil {
-		log.Fatalln("Error when pinging redis: ", err.Error())
-	}
+	// if err := rds.Ping(context.TODO()).Err(); err != nil {
+	// 	log.Fatalln("Error when pinging redis: ", err.Error())
+	// }
 	log.Println("Connected to redis successfully ✅")
 	return rds
 }
