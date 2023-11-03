@@ -1,4 +1,4 @@
-package services
+package repo
 
 import (
 	"database/sql"
@@ -8,9 +8,7 @@ import (
 	"github.com/rohitxdev/go-api-template/internal/env"
 )
 
-var (
-	db = connectToDb(env.Values.DB_URL)
-)
+var Db = connectToDb(env.DB_URL)
 
 func connectToDb(URL string) *sql.DB {
 	log.Println("Connecting to database...")

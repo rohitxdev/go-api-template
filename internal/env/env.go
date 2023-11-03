@@ -13,22 +13,64 @@ import (
 )
 
 var (
-	Values = loadEnv()
+	HOST                   = env.HOST
+	PORT                   = env.PORT
+	JWT_SECRET             = env.JWT_SECRET
+	TLS_CERT_PATH          = env.TLS_CERT_PATH
+	TLS_KEY_PATH           = env.TLS_KEY_PATH
+	APP_ENV                = env.APP_ENV
+	DB_URL                 = env.DB_URL
+	GOOGLE_CLIENT_ID       = env.GOOGLE_CLIENT_ID
+	GOOGLE_CLIENT_SECRET   = env.GOOGLE_CLIENT_SECRET
+	FACEBOOK_CLIENT_ID     = env.FACEBOOK_CLIENT_ID
+	FACEBOOK_CLIENT_SECRET = env.FACEBOOK_CLIENT_SECRET
+	REDIS_HOST             = env.REDIS_HOST
+	REDIS_PORT             = env.REDIS_PORT
+	REDIS_USERNAME         = env.REDIS_USERNAME
+	REDIS_PASSWORD         = env.REDIS_PASSWORD
+	HTTPS                  = env.HTTPS
+	IS_DEV                 = env.IS_DEV
 )
 
-type env struct {
-	HOST                     string `validate:"required,ip"`
-	PORT                     string `validate:"required,gte=0"`
-	JWT_ACCESS_TOKEN_SECRET  string `validate:"required"`
-	JWT_REFRESH_TOKEN_SECRET string `validate:"required"`
-	TLS_CERT_PATH            string `validate:"required,filepath"`
-	TLS_KEY_PATH             string `validate:"required,filepath"`
-	APP_ENV                  string `validate:"required,oneof=development production"`
-	DB_URL                   string `validate:"required"`
-	IS_DEV                   bool
+var env = struct {
+	HOST                   string `validate:"required,ip"`
+	PORT                   string `validate:"required,gte=0"`
+	JWT_SECRET             string `validate:"required"`
+	TLS_CERT_PATH          string `validate:"required,filepath"`
+	TLS_KEY_PATH           string `validate:"required,filepath"`
+	APP_ENV                string `validate:"required,oneof=development production"`
+	DB_URL                 string `validate:"required"`
+	GOOGLE_CLIENT_ID       string
+	GOOGLE_CLIENT_SECRET   string
+	FACEBOOK_CLIENT_ID     string
+	FACEBOOK_CLIENT_SECRET string
+	REDIS_HOST             string
+	REDIS_PORT             string
+	REDIS_USERNAME         string
+	REDIS_PASSWORD         string
+	HTTPS                  bool
+	IS_DEV                 bool
+}{
+	APP_ENV:                os.Getenv("APP_ENV"),
+	HOST:                   os.Getenv("HOST"),
+	PORT:                   os.Getenv("PORT"),
+	JWT_SECRET:             os.Getenv("JWT_SECRET"),
+	TLS_CERT_PATH:          os.Getenv("TLS_CERT_PATH"),
+	TLS_KEY_PATH:           os.Getenv("TLS_KEY_PATH"),
+	DB_URL:                 os.Getenv("DB_URL"),
+	GOOGLE_CLIENT_ID:       os.Getenv("GOOGLE_CLIENT_ID"),
+	GOOGLE_CLIENT_SECRET:   os.Getenv("GOOGLE_CLIENT_SECRET"),
+	FACEBOOK_CLIENT_ID:     os.Getenv("FACEBOOK_CLIENT_ID"),
+	FACEBOOK_CLIENT_SECRET: os.Getenv("FACEBOOK_CLIENT_SECRET"),
+	REDIS_HOST:             os.Getenv("REDIS_HOST"),
+	REDIS_PORT:             os.Getenv("REDIS_PORT"),
+	REDIS_USERNAME:         os.Getenv("REDIS_USERNAME"),
+	REDIS_PASSWORD:         os.Getenv("REDIS_PASSWORD"),
+	HTTPS:                  os.Getenv("HTTPS") == "true",
+	IS_DEV:                 os.Getenv("APP_ENV") != "production",
 }
 
-func printEnvVars(v env) {
+func printEnv(v any) {
 	x := reflect.ValueOf(v)
 	fmt.Println()
 	for i := 0; i < x.NumField(); i++ {
@@ -44,35 +86,27 @@ func printEnvVars(v env) {
 	fmt.Println()
 }
 
-func loadEnv() env {
+func loadEnv() {
 	log.Println("Loading environment variables...")
+
 	err := godotenv.Load(".env")
 	if err != nil {
 		//For testing. ".env" doesn't work when using 'go test' command so we need to use "../../.env"
 		godotenv.Load("../../.env")
 	}
 
-	envVars := env{
-		APP_ENV:                  os.Getenv("APP_ENV"),
-		HOST:                     os.Getenv("HOST"),
-		PORT:                     os.Getenv("PORT"),
-		JWT_ACCESS_TOKEN_SECRET:  os.Getenv("JWT_ACCESS_TOKEN_SECRET"),
-		JWT_REFRESH_TOKEN_SECRET: os.Getenv("JWT_REFRESH_TOKEN_SECRET"),
-		TLS_CERT_PATH:            os.Getenv("TLS_CERT_PATH"),
-		TLS_KEY_PATH:             os.Getenv("TLS_KEY_PATH"),
-		DB_URL:                   os.Getenv("DB_URL"),
-		IS_DEV:                   os.Getenv("APP_ENV") != "production",
-	}
-
 	validate := validator.New()
-	if err := validate.Struct(envVars); err != nil {
+	if err := validate.Struct(env); err != nil {
 		log.Fatalln(err)
 	}
 
 	log.Println("Loaded environment variables successfully ✅")
-	if envVars.IS_DEV {
-		printEnvVars(envVars)
-	}
 
-	return envVars
+	if env.IS_DEV {
+		printEnv(env)
+	}
+}
+
+func init() {
+	loadEnv()
 }

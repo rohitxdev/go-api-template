@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"html/template"
@@ -15,18 +14,17 @@ import (
 	"strings"
 	"time"
 
+	echoPrometheus "github.com/globocom/echo-prometheus"
 	"github.com/go-playground/validator/v10"
-	"github.com/labstack/echo-contrib/echoprometheus"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rohitxdev/go-api-template/internal/env"
-	"github.com/rohitxdev/go-api-template/internal/handlers"
+	"github.com/rohitxdev/go-api-template/internal/handler"
 	echoSwagger "github.com/swaggo/echo-swagger"
 
 	_ "github.com/swaggo/echo-swagger/example/docs"
 )
-
-var Env = env.Values
 
 type Template struct {
 	templates *template.Template
@@ -40,7 +38,7 @@ type CustomValidator struct {
 	validator *validator.Validate
 }
 
-func (cv *CustomValidator) Validate(i interface{}) error {
+func (cv *CustomValidator) Validate(i any) error {
 	if err := cv.validator.Struct(i); err != nil {
 		return echo.NewHTTPError(http.StatusUnprocessableEntity, err)
 	}
@@ -49,7 +47,7 @@ func (cv *CustomValidator) Validate(i interface{}) error {
 
 func getLogOutput() *os.File {
 	logOutput := new(os.File)
-	if Env.IS_DEV {
+	if env.IS_DEV {
 		logOutput = os.Stdout
 	} else {
 		file, err := os.OpenFile("logs.txt", os.O_APPEND|os.O_CREATE, 0666)
@@ -61,20 +59,20 @@ func getLogOutput() *os.File {
 	return logOutput
 }
 
-func getHTMLErrorString(statusCode int, errorMessage string) string {
-	buf := new(bytes.Buffer)
-	tmpl, err := template.New("error.templ").ParseFiles("./views/error.templ")
-	if err != nil {
-		log.Println("Error: Could not parse error template view", err.Error())
-		return fmt.Sprintf("HTTP Error %v - %v", statusCode, errorMessage)
-	}
-	err = tmpl.Execute(buf, map[string]interface{}{"StatusCode": statusCode, "ErrorMessage": errorMessage})
-	if err != nil {
-		return err.Error()
-	}
-	return buf.String()
-}
+//	@title			SAAS App API
+//	@version		1.0
+//	@description	This is a sample server Petstore server.
+//	@termsOfService	http://swagger.io/terms/
 
+//	@contact.name	API Support
+//	@contact.url	http://www.swagger.io/support
+//	@contact.email	support@swagger.io
+
+//	@license.name	Apache 2.0
+//	@license.url	http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host		petstore.swagger.io
+// @BasePath	/v2
 func main() {
 	logOutput := getLogOutput()
 	defer logOutput.Close()
@@ -82,9 +80,12 @@ func main() {
 	e := echo.New()
 
 	e.Renderer = &Template{
-		templates: template.Must(template.ParseGlob("./views/*.templ")),
+		templates: template.Must(template.ParseGlob("./templates/*.templ")),
 	}
+
 	e.Validator = &CustomValidator{validator: validator.New()}
+
+	e.GET("/docs/*", echoSwagger.WrapHandler)
 
 	e.Static("/", "./public")
 
@@ -92,11 +93,10 @@ func main() {
 
 	e.Pre(middleware.Secure())
 
-	e.Pre(middleware.CORSWithConfig(middleware.CORSConfig{AllowCredentials: true}))
+	e.Pre(middleware.CORS())
 
 	e.Pre(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
-		Timeout:      5 * time.Second,
-		ErrorMessage: getHTMLErrorString(503, "Timeout error. Server took too long to respond."),
+		Timeout: 5 * time.Second,
 	}))
 
 	e.Pre(middleware.LoggerWithConfig(middleware.LoggerConfig{
@@ -104,20 +104,21 @@ func main() {
 		Output: logOutput,
 	}))
 
-	e.Pre(middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
-		Skipper: middleware.DefaultSkipper,
-		Store: middleware.NewRateLimiterMemoryStoreWithConfig(middleware.RateLimiterMemoryStoreConfig{
-			Rate:      30,
-			Burst:     60,
-			ExpiresIn: 1 * time.Minute,
-		})}))
+	// e.Pre(middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
+	// 	Skipper: middleware.DefaultSkipper,
+	// 	Store: middleware.NewRateLimiterMemoryStoreWithConfig(middleware.RateLimiterMemoryStoreConfig{
+	// 		Rate:      30,
+	// 		Burst:     60,
+	// 		ExpiresIn: 1 * time.Minute,
+	// 	})}))
 
-	e.GET("/api/docs/*", echoSwagger.WrapHandler)
 	e.Use(middleware.GzipWithConfig(middleware.GzipConfig{Skipper: func(c echo.Context) bool {
-		return strings.Contains(c.Path(), "/metrics")
+		return !strings.Contains(c.Request().Header.Get("Accept-Encoding"), "gzip") || strings.HasSuffix(c.Path(), "/metrics")
 	}}))
-	e.Pre(echoprometheus.NewMiddleware("echo"))
-	e.GET("/metrics", echoprometheus.NewHandler())
+
+	e.Use(echoPrometheus.MetricsMiddleware())
+
+	e.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
 
 	host, err := os.Hostname()
 	if err != nil {
@@ -131,7 +132,7 @@ func main() {
 				Value string
 			}{
 				{Key: "Name", Value: "Go + Echo App"},
-				{Key: "Env", Value: env.Values.APP_ENV},
+				{Key: "Env", Value: env.APP_ENV},
 				{Key: "Host", Value: host},
 				{Key: "PID", Value: strconv.Itoa(os.Getpid())},
 				{Key: "OS", Value: runtime.GOOS},
@@ -139,10 +140,17 @@ func main() {
 		})
 	})
 
-	handlers.MountRoutesOn(e)
+	handler.MountRoutesOn(e)
 
 	go func() {
-		if err := e.StartTLS(Env.HOST+":"+Env.PORT, Env.TLS_CERT_PATH, Env.TLS_KEY_PATH); err != nil {
+		var err error
+		address := env.HOST + ":" + env.PORT
+		if env.HTTPS {
+			e.StartTLS(address, env.TLS_CERT_PATH, env.TLS_KEY_PATH)
+		} else {
+			e.Start(address)
+		}
+		if err != nil {
 			log.Fatalln(err)
 		}
 	}()
@@ -150,6 +158,7 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt)
 	<-quit
+
 	fmt.Println("\nShutting down server...")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
