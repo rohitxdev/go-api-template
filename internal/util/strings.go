@@ -10,3 +10,15 @@ func ReverseString(s string) string {
 	}
 	return sb.String()
 }
+
+func SanitizeEmail(email string) string {
+	emailParts := strings.Split(email, "@")
+	username := emailParts[0]
+	domain := emailParts[1]
+	if strings.Contains(username, "+") {
+		username = strings.Split(username, "+")[0]
+	}
+	username = strings.ReplaceAll(username, "-", "")
+	username = strings.ReplaceAll(username, ".", "")
+	return username + "@" + domain
+}

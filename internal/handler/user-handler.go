@@ -4,28 +4,31 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
+
 	"github.com/rohitxdev/go-api-template/internal/repo"
+	"github.com/rohitxdev/go-api-template/internal/util"
 )
 
-func getCurrentUser(c echo.Context) *repo.User {
-	if user, ok := c.Get("user").(*repo.User); ok {
-		return user
-	}
-	return nil
-}
+/*----------------------------------- Get Me Handler ----------------------------------- */
 
 func GetMe(c echo.Context) error {
-	user := getCurrentUser(c)
-	if user == nil {
-		return c.String(http.StatusUnauthorized, echo.ErrUnauthorized.Error())
+	user, ok := c.Get("user").(*repo.User)
+	if !ok {
+		return c.String(http.StatusUnauthorized, ErrUserNotLoggedIn.Error())
 	}
 	return c.JSON(http.StatusOK, user)
 }
 
+/*----------------------------------- Get All Users Handler ----------------------------------- */
+
 func GetAllUsers(c echo.Context) error {
-	users, err := repo.UserRepo.GetAll(c.Request().Context())
+	req := newPaginatedQuery()
+	if err := util.BindAndValidate(c, req); err != nil {
+		return err
+	}
+	users, err := repo.UserRepo.GetAll(c.Request().Context(), uint(req.Page))
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
-	return c.JSON(200, users)
+	return c.JSON(http.StatusOK, users)
 }

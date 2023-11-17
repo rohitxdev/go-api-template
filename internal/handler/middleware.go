@@ -5,8 +5,9 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
+
 	"github.com/rohitxdev/go-api-template/internal/repo"
-	"github.com/rohitxdev/go-api-template/internal/service"
+	"github.com/rohitxdev/go-api-template/internal/util"
 )
 
 type role uint8
@@ -23,18 +24,22 @@ var roleMap = map[string]role{
 	"admin": RoleAdmin,
 }
 
+type AuthRequest struct {
+	Authorization string `header:"Authorization" validate:"required,startswith=Bearer "`
+}
+
 func Auth(role role) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			authHeader := c.Request().Header.Get("Authorization")
-			if !strings.HasPrefix(authHeader, "Bearer ") {
-				return c.String(http.StatusUnauthorized, "invalid authorization header")
+			req := new(AuthRequest)
+			if err := util.BindAndValidate(c, req); err != nil {
+				return err
 			}
-			accessToken := strings.Split(authHeader, " ")[1]
+			accessToken := strings.Split(req.Authorization, " ")[1]
 			if accessToken == "" {
 				return c.String(http.StatusUnauthorized, "invalid bearer token")
 			}
-			userId, err := service.VerifyJWT(accessToken)
+			userId, err := util.VerifyJWT(accessToken)
 			if err != nil {
 				return c.String(http.StatusUnauthorized, err.Error())
 			}
@@ -43,7 +48,7 @@ func Auth(role role) echo.MiddlewareFunc {
 				return c.String(http.StatusUnauthorized, err.Error())
 			}
 			if roleMap[user.Role] < role {
-				return c.String(http.StatusForbidden, echo.ErrForbidden.Error())
+				return c.String(http.StatusForbidden, "forbidden")
 			}
 			c.Set("user", user)
 			return next(c)

@@ -2,52 +2,60 @@ package service
 
 import (
 	"bytes"
-	"crypto/tls"
 	"fmt"
 	"html/template"
-	"log"
+	"strconv"
 
 	"gopkg.in/gomail.v2"
+
+	"github.com/rohitxdev/go-api-template/internal/env"
 )
 
-type Email struct {
-	To          []string
-	Subject     string
-	Body        string
-	ContentType string
+var smtpPort, _ = strconv.ParseUint(env.SMTP_PORT, 10, 16)
+var smtpDialer = gomail.NewDialer(env.SMTP_HOST, int(smtpPort), env.SMTP_USERNAME, env.SMTP_PASSWORD)
+
+var passwordResetTemplate *template.Template
+
+func init() {
+	var err error
+	passwordResetTemplate, err = template.New("password-reset.tmpl").ParseFiles(env.PROJECT_ROOT + "/templates/emails/password-reset.tmpl")
+	if err != nil {
+		panic(err)
+	}
 }
 
-func SendEmail(e *Email) error {
-	from := "rohitreddy.gangwar@gmail.com"
-	password := "zxkz vsgr smqb muwy"
+type Email struct {
+	ToAddresses []string
+	Cc          []string
+	Bcc         []string
+	Subject     string
+	ContentType string
+	Body        string
+	FromAddress string
+	FromName    string
+}
 
-	d := gomail.NewDialer("smtp.gmail.com", 587, from, password)
-	d.TLSConfig = &tls.Config{InsecureSkipVerify: true}
+func SendEmail(email *Email) error {
 	msg := gomail.NewMessage()
-	msg.SetHeader("From", from)
-	msg.SetHeader("To", e.To...)
-	msg.SetHeader("Subject", e.Subject)
-	msg.SetBody(e.ContentType, e.Body)
-	if err := d.DialAndSend(msg); err != nil {
-		return fmt.Errorf("could not send email: %s", err.Error())
+	msg.SetHeaders(map[string][]string{
+		"From":    {msg.FormatAddress(email.FromAddress, email.FromName)},
+		"Subject": {email.Subject},
+		"To":      email.ToAddresses,
+		"Cc":      email.Cc,
+		"Bcc":     email.Bcc,
+	})
+	msg.SetBody(email.ContentType, email.Body)
+	if err := smtpDialer.DialAndSend(msg); err != nil {
+		return fmt.Errorf("could not send email: %w", err)
 	}
-	for _, v := range e.To {
-		fmt.Printf("Sent email to %s\n", v)
-	}
-	fmt.Println("Sent email successfully!")
 	return nil
 }
 
-func SendOTP(code string, toEmail string) {
-	t := template.New("2fa.templ")
-	templ, err := t.ParseFiles("./templates/2fa.templ")
-	if err != nil {
-		log.Fatalln("could not parse HTML:", err.Error())
-	}
+func SendPasswordResetLink(urlWithToken string, toEmail string) {
 	var buf bytes.Buffer
-	err = templ.Execute(&buf, map[string]any{"Code": code, "Name": toEmail})
+	err := passwordResetTemplate.Execute(&buf, map[string]any{"URL": urlWithToken})
 	if err != nil {
-		log.Fatalln("could not execute template:", err.Error())
+		panic(err)
 	}
-	SendEmail(&Email{To: []string{toEmail}, ContentType: "text/html", Subject: "Your One-Time Password (OTP) for login", Body: buf.String()})
+	SendEmail(&Email{ToAddresses: []string{toEmail}, Subject: "Password Reset", Body: buf.String(), ContentType: "text/html", FromAddress: "rohitreddy.gangwar@gmail.com"})
 }

@@ -4,35 +4,28 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
-	"time"
 
-	"github.com/golang-jwt/jwt"
-	"github.com/rohitxdev/go-api-template/internal/env"
-	"github.com/rohitxdev/go-api-template/internal/repo"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
-)
 
-const (
-	AccessTokenExpiration  = time.Minute * 10
-	RefreshTokenExpiration = time.Hour * 24 * 7
+	"github.com/rohitxdev/go-api-template/internal/repo"
+	"github.com/rohitxdev/go-api-template/internal/util"
 )
 
 var (
-	errIncorrectPassword = errors.New("incorrect password")
-	errTokenExpired      = errors.New("token expired")
-	errMalformedToken    = errors.New("malformed token")
+	ErrIncorrectPassword = errors.New("incorrect password")
 )
 
 func LogIn(ctx context.Context, email string, password string) (string, string, error) {
-	user, err := repo.UserRepo.GetByEmail(ctx, email)
+	user, err := repo.UserRepo.GetByEmail(ctx, util.SanitizeEmail(email))
 	if err != nil {
 		return "", "", err
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
-		return "", "", errIncorrectPassword
+		return "", "", ErrIncorrectPassword
 	}
-	return GenerateAccessAndRefreshTokens(uint(user.Id))
+	accessToken, refreshToken := util.GenerateAccessAndRefreshTokens(uint(user.Id))
+	return accessToken, refreshToken, nil
 }
 
 func SignUp(ctx context.Context, email string, password string) (string, string, error) {
@@ -41,61 +34,29 @@ func SignUp(ctx context.Context, email string, password string) (string, string,
 	if err != nil {
 		return "", "", err
 	}
-	user.Email = email
+	user.Email = util.SanitizeEmail(email)
 	user.PasswordHash = string(passwordHash)
 	userId, err := repo.UserRepo.Create(ctx, user)
 	if err != nil {
 		return "", "", err
 	}
-	return GenerateAccessAndRefreshTokens(userId)
-}
-
-func GenerateJWT(userId uint, expiresIn time.Duration) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS512, jwt.StandardClaims{Id: fmt.Sprintf("%v", userId), ExpiresAt: time.Now().Add(expiresIn).Unix()})
-	return token.SignedString([]byte(env.JWT_SECRET))
-}
-
-func VerifyJWT(token string) (uint, error) {
-	claims := new(jwt.StandardClaims)
-	_, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (interface{}, error) {
-		return []byte(env.JWT_SECRET), nil
-	})
-	if err != nil {
-		if err, ok := err.(*jwt.ValidationError); ok {
-			switch err.Errors {
-			case jwt.ValidationErrorExpired:
-				return 0, errTokenExpired
-			case jwt.ValidationErrorMalformed:
-				return 0, errMalformedToken
-			}
-		}
-		return 0, err
-	}
-	userId, _ := strconv.Atoi(claims.Id)
-	return uint(userId), nil
-}
-
-func GenerateAccessAndRefreshTokens(userId uint) (string, string, error) {
-	accessToken, _ := GenerateJWT(userId, AccessTokenExpiration)
-	refreshToken, _ := GenerateJWT(userId, RefreshTokenExpiration)
+	accessToken, refreshToken := util.GenerateAccessAndRefreshTokens(uint(userId))
 	return accessToken, refreshToken, nil
 }
 
-// Creates user if does not exist and returns access and refresh tokens.
+// UpsertUser creates user if user does not exist and returns access and refresh tokens.
 func UpsertUser(ctx context.Context, email string) (string, string, error) {
-	user, err := repo.UserRepo.GetByEmail(ctx, email)
+	user, err := repo.UserRepo.GetByEmail(ctx, util.SanitizeEmail(email))
 	if err != nil {
 		if err == repo.ErrUserNotFound {
-			accessToken, refreshToken, err := SignUp(ctx, email, "")
+			accessToken, refreshToken, err := SignUp(ctx, email, uuid.NewString())
 			if err != nil {
 				return "", "", fmt.Errorf("could not sign up user: %s", err.Error())
 			}
 			return accessToken, refreshToken, nil
 		}
+		return "", "", err
 	}
-	accessToken, refreshToken, err := GenerateAccessAndRefreshTokens(uint(user.Id))
-	if err != nil {
-		return "", "", fmt.Errorf("could not log in user: %s", err.Error())
-	}
+	accessToken, refreshToken := util.GenerateAccessAndRefreshTokens(uint(user.Id))
 	return accessToken, refreshToken, nil
 }

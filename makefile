@@ -1,12 +1,9 @@
 .PHONY: build build-prod start run dev test bench
 
 include .env
-export
+export 
 
-DOCKER=docker run --rm -it -p 127.0.0.1:${PORT}:${PORT} -v $(shell pwd):/usr/src/app --env-file=.env go-api
-
-build-image:
-	docker build -t go-api .
+PROJECT_ROOT=${PWD}
 
 build : 
 	go build -o ./bin ./cmd/main

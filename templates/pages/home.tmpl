@@ -104,6 +104,10 @@
         color: hsl(0, 0%, 12%);
     }
 
+    .login-btn:first-of-type {
+        margin-top: 1rem;
+    }
+
     .login-btn>span {
         margin-inline: auto;
     }
@@ -126,15 +130,19 @@
         <img src="/images/swagger.svg" alt="Swagger" title="Swagger" height="48" width="48">
         <a href="/docs">View API docs</a>
     </div>
-    <a href="/v1/auth/oauth2/facebook" class="login-btn">
-        <img src="/images/facebook.svg" alt="Facebook logo" height="24">
-        <span>Login with Facebook</span>
-    </a>
     <a href="/v1/auth/oauth2/google" class="login-btn">
-        <img src="/images/google.svg" alt="Google logo" height="24">
+        <img src="/images/google.svg" alt="Google" height="24" width="24">
         <span>Login with Google</span>
     </a>
-    <img src="/images/go-logo.svg" height="200" width="300" alt="Golang logo">
+    <a href="/v1/auth/oauth2/discord" class="login-btn">
+        <img src="/images/discord.svg" alt="Discord" height="24" width="24">
+        <span>Login with Discord</span>
+    </a>
+    <a href="/v1/auth/oauth2/github" class="login-btn">
+        <img src="/images/github.svg" alt="Github" height="24" width="24">
+        <span>Login with Github</span>
+    </a>
+    <img src="/images/go.svg" height="200" width="300" alt="Golang logo">
     <p>+</p>
     <img src="/images/echo.svg" height="200" width="300" alt="Echo logo">
     <table>
