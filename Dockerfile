@@ -1,4 +1,4 @@
-FROM golang:1.21.3-alpine3.17
+FROM golang:1.21.4-alpine3.17
 
 WORKDIR /usr/src/app
 
@@ -12,6 +12,8 @@ RUN go mod download && go mod verify
 
 COPY . .
 
-RUN go build -o ./bin/main ./cmd/main
+RUN make build
 
-CMD ./bin/main
+CMD make start
+
+EXPOSE 8443

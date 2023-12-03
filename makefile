@@ -1,15 +1,14 @@
-.PHONY: build build-prod start run dev test bench
-
 include .env
-export 
 
-PROJECT_ROOT=${PWD}
+protocol=http
+ifeq ($(HTTPS),true)
+	protocol=https
+endif
 
-build : 
-	go build -o ./bin ./cmd/main
+.PHONY: build start run dev doc-gen bench test test-cover pprof
 
-build-prod:
-	go build -trimpath -ldflags="-extldflags=-static -s -w" -tags osusergo,netgo -buildmode=pie -o ./bin ./cmd/main
+build:
+	make doc-gen && rm -rf ./bin && CGO_ENABLED=0 go build -trimpath -buildmode=pie -o ./bin/main ./cmd/main
 
 start:
 	./bin/main
@@ -20,8 +19,17 @@ run:
 dev:
 	air
 
+doc-gen:
+	swag init -q -g ./handler/router.go -o ./docs
+
+bench:
+	go test -count=4 -v -bench=. ./...
+
 test:
 	go test -v ./...
 
-bench:
-	go test -v -bench=. ./...
+test-cover:
+	go test -coverprofile=/tmp/coverage.out ./... && go tool cover -html=/tmp/coverage.out
+
+pprof:
+	curl -o ./cmd/main/default.pgo $(protocol)://$(HOST):$(PORT)/debug/pprof/profile?seconds=30
