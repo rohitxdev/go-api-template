@@ -23,5 +23,8 @@ jobs:
         with:
           go-version: '1.21.4'
 
+      - name: Install Go binaries
+        run: go install github.com/swaggo/swag/cmd/swag@latest
+
       - name: Build Go program
         run: make build
