@@ -1,4 +1,4 @@
-include .env
+-include .env
 
 protocol=http
 ifeq ($(HTTPS),true)
