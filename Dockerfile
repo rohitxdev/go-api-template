@@ -4,7 +4,7 @@ WORKDIR /usr/src/app
 
 RUN apk add --no-cache make
 
-RUN go install github.com/cosmtrek/air@latest
+RUN go install github.com/swaggo/swag/cmd/swag@latest
 
 COPY go.mod go.sum ./
 
