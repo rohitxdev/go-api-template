@@ -1,6 +1,6 @@
 -include .env
 
-export PATH=$(go env GOPATH)/bin:$PATH
+export PATH=$(shell printenv PATH):$(go env GOPATH)/bin
 
 protocol=http
 ifeq ($(HTTPS),true)
