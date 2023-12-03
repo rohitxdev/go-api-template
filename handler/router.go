@@ -131,7 +131,11 @@ func GetEcho() *echo.Echo {
 
 	e.Validator = &echoValidator{validator: validator.New()}
 
-	e.StaticFS("/", echo.MustSubFS(embedded.FS, "public"))
+	e.Pre(middleware.StaticWithConfig(middleware.StaticConfig{
+		Root:       "public",
+		Filesystem: http.FS(embedded.FS),
+		HTML5:      true,
+	}))
 
 	e.Pre(middleware.Recover())
 
