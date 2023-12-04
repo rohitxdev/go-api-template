@@ -19,44 +19,37 @@ import (
 
 var oAuth2State = ulid.Make().String()
 
-func GetOAuth2User[T GoogleUser | GithubUser | DiscordUser](c echo.Context, config *oauth2.Config, userDataEndpoint string) (*T, error) {
+func GetOAuth2UserEmail(c echo.Context, config *oauth2.Config, userDataEndpoint string) (string, error) {
 	code := c.FormValue("code")
 	state := c.FormValue("state")
 	if state != oAuth2State {
-		return nil, fmt.Errorf("invalid oauth2 state")
+		return "", fmt.Errorf("invalid oauth2 state")
 	}
 	token, err := config.Exchange(c.Request().Context(), code)
 	if err != nil {
-		return nil, fmt.Errorf("code exchange failed: %w", err)
+		return "", fmt.Errorf("code exchange failed: %w", err)
 	}
 	client := config.Client(c.Request().Context(), token)
 	res, err := client.Get(userDataEndpoint)
 	if err != nil {
-		return nil, fmt.Errorf("failed getting user info: %w", err)
+		return "", fmt.Errorf("failed getting user info: %w", err)
 	}
 	defer res.Body.Close()
 	contents, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed reading response body: %w", err)
+		return "", fmt.Errorf("failed reading response body: %w", err)
 	}
-	user := new(T)
-	err = json.Unmarshal(contents, user)
+	user := make(map[string]any)
+	err = json.Unmarshal(contents, &user)
 	if err != nil {
-		return nil, fmt.Errorf("failed unmarshalling response: %w", err)
+		return "", fmt.Errorf("failed unmarshalling response: %w", err)
 	}
-	return user, nil
-}
-
-func OAuth2Callback(c echo.Context, email string) error {
-	tokens, err := service.UpsertUser(c.Request().Context(), email)
-	if err != nil {
-		return c.String(http.StatusInternalServerError, err.Error())
+	email, ok := user["email"].(string)
+	if email == "" || !ok {
+		return "", fmt.Errorf("email is empty")
 	}
-	c.SetCookie(util.CreateLogInCookie(tokens.RefreshToken))
-	return c.JSON(http.StatusOK, echo.Map{"access_token": tokens.AccessToken})
+	return email, nil
 }
-
-/*----------------------------------- Google Login Handler ----------------------------------- */
 
 var googleOAuth2Config = &oauth2.Config{
 	ClientID:     env.GOOGLE_CLIENT_ID,
@@ -66,36 +59,6 @@ var googleOAuth2Config = &oauth2.Config{
 	Scopes:       []string{"openid email", "openid profile"},
 }
 
-type GoogleUser struct {
-	Id    string `json:"id,omitempty"`
-	Email string `json:"email,omitempty"`
-	Name  string `json:"name,omitempty"`
-	Image string `json:"picture,omitempty"`
-}
-
-// @Summary		Google Login
-// @Description	Log in with Google
-// @Tags			oauth2
-// @Accept			application/json
-// @Produce		application/json
-// @Router			/auth/oauth2/google [GET]
-// @Success		200	object	LogInResponse
-// @Failure		500	string	any
-func GoogleLogIn(c echo.Context) error {
-	return c.Redirect(http.StatusTemporaryRedirect, googleOAuth2Config.AuthCodeURL(oAuth2State, oauth2.ApprovalForce))
-}
-
-func GoogleCallback(c echo.Context) error {
-	googleUser, err := GetOAuth2User[GoogleUser](c, googleOAuth2Config, "https://www.googleapis.com/oauth2/v2/userinfo")
-	if err != nil {
-		return c.String(http.StatusInternalServerError, err.Error())
-	}
-	return OAuth2Callback(c, googleUser.Email)
-
-}
-
-/*----------------------------------- Github Login Handler ----------------------------------- */
-
 var githubOAuth2Config = &oauth2.Config{
 	ClientID:     env.GITHUB_CLIENT_ID,
 	ClientSecret: env.GITHUB_CLIENT_SECRET,
@@ -103,35 +66,6 @@ var githubOAuth2Config = &oauth2.Config{
 	RedirectURL:  "https://localhost:8443/v1/auth/oauth2/callback/github",
 	Scopes:       []string{"read:user", "user:email"},
 }
-
-type GithubUser struct {
-	Id    uint   `json:"id,omitempty"`
-	Email string `json:"email,omitempty"`
-	Name  string `json:"name,omitempty"`
-	Image string `json:"avatar_url,omitempty"`
-}
-
-// @Summary		Github Login
-// @Description	Log in with Github
-// @Tags			oauth2
-// @Accept			application/json
-// @Produce		application/json
-// @Router			/auth/oauth2/github [GET]
-// @Success		200	object	LogInResponse
-// @Failure		500	string	any
-func GithubLogIn(c echo.Context) error {
-	return c.Redirect(http.StatusTemporaryRedirect, githubOAuth2Config.AuthCodeURL(oAuth2State, oauth2.ApprovalForce))
-}
-
-func GithubCallback(c echo.Context) error {
-	githubUser, err := GetOAuth2User[GithubUser](c, githubOAuth2Config, "https://api.github.com/user")
-	if err != nil {
-		return c.String(http.StatusInternalServerError, err.Error())
-	}
-	return OAuth2Callback(c, githubUser.Email)
-}
-
-/*----------------------------------- Discord Login Handler ----------------------------------- */
 
 var discordEndpoint = oauth2.Endpoint{
 	AuthURL:  "https://discord.com/oauth2/authorize",
@@ -146,28 +80,69 @@ var discordOAuth2Config = &oauth2.Config{
 	Scopes:       []string{"identify", "email"},
 }
 
-type DiscordUser struct {
-	Id    string `json:"id,omitempty"`
-	Name  string `json:"global_name,omitempty"`
-	Email string `json:"email,omitempty"`
+type OAuth2LogInRequest struct {
+	Provider string `param:"provider" validate:"required,oneof=google github discord"`
 }
 
-// @Summary		Discord Login
-// @Description	Log in with Discord
-// @Tags			oauth2
+// @Summary		OAuth2 Login
+// @Description	Log in with OAuth2
+// @Tags			auth
 // @Accept			application/json
 // @Produce		application/json
-// @Router			/auth/oauth2/discord [GET]
+// @Router			/auth/oauth2/{provider} [GET]
+// @Param provider   path string true "OAuth2 provider"
 // @Success		200	object	LogInResponse
 // @Failure		500	string	any
-func DiscordLogIn(c echo.Context) error {
-	return c.Redirect(http.StatusTemporaryRedirect, discordOAuth2Config.AuthCodeURL(oAuth2State, oauth2.ApprovalForce))
+func OAuth2LogIn(c echo.Context) error {
+	req := new(OAuth2LogInRequest)
+	if err := util.BindAndValidate(c, req); err != nil {
+		return err
+	}
+
+	switch req.Provider {
+	case "google":
+		return c.Redirect(http.StatusTemporaryRedirect, googleOAuth2Config.AuthCodeURL(oAuth2State, oauth2.ApprovalForce))
+	case "github":
+		return c.Redirect(http.StatusTemporaryRedirect, githubOAuth2Config.AuthCodeURL(oAuth2State, oauth2.ApprovalForce))
+	case "discord":
+		return c.Redirect(http.StatusTemporaryRedirect, discordOAuth2Config.AuthCodeURL(oAuth2State, oauth2.ApprovalForce))
+	default:
+		return c.String(http.StatusUnprocessableEntity, "invalid provider")
+	}
 }
 
-func DiscordCallback(c echo.Context) error {
-	discordUser, err := GetOAuth2User[DiscordUser](c, discordOAuth2Config, "https://discord.com/api/users/@me")
+type OAuth2CallbackRequest struct {
+	Provider string `param:"provider" validate:"required,oneof=google github discord"`
+}
+
+func OAuth2Callback(c echo.Context) error {
+	req := new(OAuth2CallbackRequest)
+	if err := util.BindAndValidate(c, req); err != nil {
+		return err
+	}
+
+	var err error
+	var email string
+
+	switch req.Provider {
+	case "google":
+		email, err = GetOAuth2UserEmail(c, googleOAuth2Config, "https://www.googleapis.com/oauth2/v2/userinfo")
+	case "github":
+		email, err = GetOAuth2UserEmail(c, githubOAuth2Config, "https://api.github.com/user")
+	case "discord":
+		email, err = GetOAuth2UserEmail(c, discordOAuth2Config, "https://discord.com/api/users/@me")
+	default:
+		return c.String(http.StatusUnprocessableEntity, "invalid provider")
+	}
+
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
-	return OAuth2Callback(c, discordUser.Email)
+
+	tokens, err := service.UpsertUser(c.Request().Context(), email)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, err.Error())
+	}
+	c.SetCookie(util.CreateLogInCookie(tokens.RefreshToken))
+	return c.JSON(http.StatusOK, echo.Map{"access_token": tokens.AccessToken})
 }

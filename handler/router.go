@@ -43,20 +43,8 @@ func RegisterRoutes(e *echo.Echo) {
 			auth.POST("/reset-password", ResetPassword)
 			auth.GET("/access-token", GetAccessToken)
 			auth.DELETE("/delete-account", DeleteAccount, Auth(RoleUser))
-
-			oauth2 := auth.Group("/oauth2")
-			{
-				oauth2.GET("/google", GoogleLogIn)
-				oauth2.GET("/github", GithubLogIn)
-				oauth2.GET("/discord", DiscordLogIn)
-
-				callback := oauth2.Group("/callback")
-				{
-					callback.GET("/google", GoogleCallback)
-					callback.GET("/github", GithubCallback)
-					callback.GET("/discord", DiscordCallback)
-				}
-			}
+			auth.GET("/oauth2/:provider", OAuth2LogIn)
+			auth.GET("/oauth2/callback/:provider", OAuth2Callback)
 		}
 
 		users := v1.Group("/users")

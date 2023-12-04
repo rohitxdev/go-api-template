@@ -146,11 +146,17 @@ paths:
       summary: Log out
       tags:
       - auth
-  /auth/oauth2/discord:
+  /auth/oauth2/{provider}:
     get:
       consumes:
       - application/json
-      description: Log in with Discord
+      description: Log in with OAuth2
+      parameters:
+      - description: OAuth2 provider
+        in: path
+        name: provider
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -162,47 +168,9 @@ paths:
           description: Internal Server Error
           schema:
             type: string
-      summary: Discord Login
+      summary: OAuth2 Login
       tags:
-      - oauth2
-  /auth/oauth2/github:
-    get:
-      consumes:
-      - application/json
-      description: Log in with Github
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.LogInResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            type: string
-      summary: Github Login
-      tags:
-      - oauth2
-  /auth/oauth2/google:
-    get:
-      consumes:
-      - application/json
-      description: Log in with Google
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handler.LogInResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            type: string
-      summary: Google Login
-      tags:
-      - oauth2
+      - auth
   /auth/sign-up:
     post:
       consumes:

@@ -144,9 +144,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/auth/oauth2/discord": {
+        "/auth/oauth2/{provider}": {
             "get": {
-                "description": "Log in with Discord",
+                "description": "Log in with OAuth2",
                 "consumes": [
                     "application/json"
                 ],
@@ -154,67 +154,18 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "oauth2"
+                    "auth"
                 ],
-                "summary": "Discord Login",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handler.LogInResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "string"
-                        }
+                "summary": "OAuth2 Login",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "OAuth2 provider",
+                        "name": "provider",
+                        "in": "path",
+                        "required": true
                     }
-                }
-            }
-        },
-        "/auth/oauth2/github": {
-            "get": {
-                "description": "Log in with Github",
-                "consumes": [
-                    "application/json"
                 ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "oauth2"
-                ],
-                "summary": "Github Login",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handler.LogInResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/auth/oauth2/google": {
-            "get": {
-                "description": "Log in with Google",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "oauth2"
-                ],
-                "summary": "Google Login",
                 "responses": {
                     "200": {
                         "description": "OK",
