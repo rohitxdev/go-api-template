@@ -17,7 +17,7 @@ require (
 	github.com/stripe/stripe-go/v76 v76.7.0
 	github.com/swaggo/echo-swagger v1.4.1
 	go.mongodb.org/mongo-driver v1.13.0
-	golang.org/x/crypto v0.16.0
+	golang.org/x/crypto v0.17.0
 	modernc.org/sqlite v1.27.0
 )
 
