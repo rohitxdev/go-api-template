@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
+	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
-	"github.com/rohitxdev/go-api-template/env"
+	"github.com/rohitxdev/go-api-template/config"
 )
 
 var (
@@ -23,19 +23,19 @@ var (
 func getS3Client() *s3.Client {
 	r2Resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 		return aws.Endpoint{
-			URL: env.S3_ENDPOINT,
+			URL: config.S3_ENDPOINT,
 		}, nil
 	})
 
-	cfg, err := config.LoadDefaultConfig(context.TODO(),
-		config.WithEndpointResolverWithOptions(r2Resolver),
-		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(env.AWS_ACCESS_KEY_ID, env.AWS_ACCESS_KEY_SECRET, "")),
+	cfg, err := awsConfig.LoadDefaultConfig(context.TODO(),
+		awsConfig.WithEndpointResolverWithOptions(r2Resolver),
+		awsConfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(config.AWS_ACCESS_KEY_ID, config.AWS_ACCESS_KEY_SECRET, "")),
 	)
 	if err != nil {
 		panic("could not load default config of S3 client: " + err.Error())
 	}
 
-	cfg.Region = env.S3_DEFAULT_REGION
+	cfg.Region = config.S3_DEFAULT_REGION
 
 	return s3.NewFromConfig(cfg)
 }

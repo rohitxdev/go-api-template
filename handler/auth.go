@@ -10,7 +10,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/rohitxdev/go-api-template/env"
+	"github.com/rohitxdev/go-api-template/config"
 	"github.com/rohitxdev/go-api-template/repo"
 	"github.com/rohitxdev/go-api-template/service"
 	"github.com/rohitxdev/go-api-template/util"
@@ -156,7 +156,7 @@ func ForgotPassword(c echo.Context) error {
 		return c.String(http.StatusInternalServerError, echo.ErrInternalServerError.Error())
 	}
 	token, _ := util.GenerateJWT(user.Id, time.Minute*10)
-	u, _ := url.Parse(fmt.Sprintf("https://%s:%s/v1/auth/reset-password", env.HOST, env.PORT))
+	u, _ := url.Parse(fmt.Sprintf("https://%s:%s/v1/auth/reset-password", config.HOST, config.PORT))
 	q := u.Query()
 	q.Set("token", token)
 	u.RawQuery = q.Encode()

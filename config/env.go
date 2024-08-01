@@ -1,4 +1,4 @@
-package env
+package config
 
 import (
 	"fmt"
@@ -12,43 +12,43 @@ import (
 )
 
 var (
-	HOST                     = env.HOST
-	PORT                     = env.PORT
-	JWT_SECRET               = env.JWT_SECRET
-	ACCESS_TOKEN_EXPIRES_IN  = env.ACCESS_TOKEN_EXPIRES_IN
-	REFRESH_TOKEN_EXPIRES_IN = env.REFRESH_TOKEN_EXPIRES_IN
-	RATE_LIMIT_PER_MINUTE    = env.RATE_LIMIT_PER_MINUTE
-	TLS_CERT_PATH            = env.TLS_CERT_PATH
-	TLS_KEY_PATH             = env.TLS_KEY_PATH
-	APP_ENV                  = env.APP_ENV
-	DB_URL                   = env.DB_URL
-	MONGODB_URL              = env.MONGODB_URL
-	REDIS_HOST               = env.REDIS_HOST
-	REDIS_PORT               = env.REDIS_PORT
-	REDIS_USERNAME           = env.REDIS_USERNAME
-	REDIS_PASSWORD           = env.REDIS_PASSWORD
-	SMTP_HOST                = env.SMTP_HOST
-	SMTP_PORT                = env.SMTP_PORT
-	SMTP_USERNAME            = env.SMTP_USERNAME
-	SMTP_PASSWORD            = env.SMTP_PASSWORD
-	S3_BUCKET_NAME           = env.S3_BUCKET_NAME
-	S3_DEFAULT_REGION        = env.S3_DEFAULT_REGION
-	AWS_ACCESS_KEY_ID        = env.AWS_ACCESS_KEY_ID
-	AWS_ACCESS_KEY_SECRET    = env.AWS_ACCESS_KEY_SECRET
-	S3_ENDPOINT              = env.S3_ENDPOINT
-	DISCORD_CLIENT_ID        = env.DISCORD_CLIENT_ID
-	DISCORD_CLIENT_SECRET    = env.DISCORD_CLIENT_SECRET
-	GOOGLE_CLIENT_ID         = env.GOOGLE_CLIENT_ID
-	GOOGLE_CLIENT_SECRET     = env.GOOGLE_CLIENT_SECRET
-	GITHUB_CLIENT_ID         = env.GITHUB_CLIENT_ID
-	GITHUB_CLIENT_SECRET     = env.GITHUB_CLIENT_SECRET
-	STRIPE_API_KEY           = env.STRIPE_API_KEY
-	AMQP_URL                 = env.AMQP_URL
-	HTTPS                    = env.HTTPS
-	IS_DEV                   = env.IS_DEV
+	HOST                     = config.HOST
+	PORT                     = config.PORT
+	JWT_SECRET               = config.JWT_SECRET
+	ACCESS_TOKEN_EXPIRES_IN  = config.ACCESS_TOKEN_EXPIRES_IN
+	REFRESH_TOKEN_EXPIRES_IN = config.REFRESH_TOKEN_EXPIRES_IN
+	RATE_LIMIT_PER_MINUTE    = config.RATE_LIMIT_PER_MINUTE
+	TLS_CERT_PATH            = config.TLS_CERT_PATH
+	TLS_KEY_PATH             = config.TLS_KEY_PATH
+	APP_ENV                  = config.APP_ENV
+	DB_URL                   = config.DB_URL
+	MONGODB_URL              = config.MONGODB_URL
+	REDIS_HOST               = config.REDIS_HOST
+	REDIS_PORT               = config.REDIS_PORT
+	REDIS_USERNAME           = config.REDIS_USERNAME
+	REDIS_PASSWORD           = config.REDIS_PASSWORD
+	SMTP_HOST                = config.SMTP_HOST
+	SMTP_PORT                = config.SMTP_PORT
+	SMTP_USERNAME            = config.SMTP_USERNAME
+	SMTP_PASSWORD            = config.SMTP_PASSWORD
+	S3_BUCKET_NAME           = config.S3_BUCKET_NAME
+	S3_DEFAULT_REGION        = config.S3_DEFAULT_REGION
+	AWS_ACCESS_KEY_ID        = config.AWS_ACCESS_KEY_ID
+	AWS_ACCESS_KEY_SECRET    = config.AWS_ACCESS_KEY_SECRET
+	S3_ENDPOINT              = config.S3_ENDPOINT
+	DISCORD_CLIENT_ID        = config.DISCORD_CLIENT_ID
+	DISCORD_CLIENT_SECRET    = config.DISCORD_CLIENT_SECRET
+	GOOGLE_CLIENT_ID         = config.GOOGLE_CLIENT_ID
+	GOOGLE_CLIENT_SECRET     = config.GOOGLE_CLIENT_SECRET
+	GITHUB_CLIENT_ID         = config.GITHUB_CLIENT_ID
+	GITHUB_CLIENT_SECRET     = config.GITHUB_CLIENT_SECRET
+	STRIPE_API_KEY           = config.STRIPE_API_KEY
+	AMQP_URL                 = config.AMQP_URL
+	HTTPS                    = config.HTTPS
+	IS_DEV                   = config.IS_DEV
 )
 
-type envs struct {
+type appConfig struct {
 	HOST                     string `validate:"required,ip"`
 	PORT                     string `validate:"required,gte=0"`
 	JWT_SECRET               string `validate:"required"`
@@ -86,7 +86,7 @@ type envs struct {
 }
 
 func PrintEnv() {
-	x := reflect.ValueOf(env)
+	x := reflect.ValueOf(config)
 	fmt.Println()
 	fmt.Println("ENVIRONMENT VARIABLES")
 	for i := 0; i < x.NumField(); i++ {
@@ -102,11 +102,11 @@ func PrintEnv() {
 	fmt.Println()
 }
 
-var env = func() envs {
-	godotenv.Load(".env")
-	godotenv.Load("../../.env")
+func loadConfig() appConfig {
+	_ = godotenv.Load(".env")
+	_ = godotenv.Load("../../.env")
 
-	ev := envs{
+	c := appConfig{
 		APP_ENV:                  os.Getenv("APP_ENV"),
 		HOST:                     os.Getenv("HOST"),
 		PORT:                     os.Getenv("PORT"),
@@ -143,9 +143,11 @@ var env = func() envs {
 		IS_DEV:                   os.Getenv("APP_ENV") != "production",
 	}
 
-	if err := validator.New().Struct(ev); err != nil {
-		panic("could not validate struct: " + err.Error())
+	if err := validator.New().Struct(c); err != nil {
+		panic("app config validation failed: " + err.Error())
 	}
 
-	return ev
-}()
+	return c
+}
+
+var config = loadConfig()

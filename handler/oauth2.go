@@ -12,7 +12,7 @@ import (
 	"golang.org/x/oauth2/github"
 	"golang.org/x/oauth2/google"
 
-	"github.com/rohitxdev/go-api-template/env"
+	"github.com/rohitxdev/go-api-template/config"
 	"github.com/rohitxdev/go-api-template/service"
 	"github.com/rohitxdev/go-api-template/util"
 )
@@ -52,16 +52,16 @@ func GetOAuth2UserEmail(c echo.Context, config *oauth2.Config, userDataEndpoint 
 }
 
 var googleOAuth2Config = &oauth2.Config{
-	ClientID:     env.GOOGLE_CLIENT_ID,
-	ClientSecret: env.GOOGLE_CLIENT_SECRET,
+	ClientID:     config.GOOGLE_CLIENT_ID,
+	ClientSecret: config.GOOGLE_CLIENT_SECRET,
 	Endpoint:     google.Endpoint,
 	RedirectURL:  "https://localhost:8443/v1/auth/oauth2/callback/google",
 	Scopes:       []string{"openid email", "openid profile"},
 }
 
 var githubOAuth2Config = &oauth2.Config{
-	ClientID:     env.GITHUB_CLIENT_ID,
-	ClientSecret: env.GITHUB_CLIENT_SECRET,
+	ClientID:     config.GITHUB_CLIENT_ID,
+	ClientSecret: config.GITHUB_CLIENT_SECRET,
 	Endpoint:     github.Endpoint,
 	RedirectURL:  "https://localhost:8443/v1/auth/oauth2/callback/github",
 	Scopes:       []string{"read:user", "user:email"},
@@ -73,8 +73,8 @@ var discordEndpoint = oauth2.Endpoint{
 }
 
 var discordOAuth2Config = &oauth2.Config{
-	ClientID:     env.DISCORD_CLIENT_ID,
-	ClientSecret: env.DISCORD_CLIENT_SECRET,
+	ClientID:     config.DISCORD_CLIENT_ID,
+	ClientSecret: config.DISCORD_CLIENT_SECRET,
 	Endpoint:     discordEndpoint,
 	RedirectURL:  "https://localhost:8443/v1/auth/oauth2/callback/discord",
 	Scopes:       []string{"identify", "email"},

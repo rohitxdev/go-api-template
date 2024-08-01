@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/rohitxdev/go-api-template/env"
+	"github.com/rohitxdev/go-api-template/config"
 	"github.com/rohitxdev/go-api-template/service"
 )
 
@@ -28,14 +28,14 @@ func TestStorageService(t *testing.T) {
 	}
 
 	t.Run("Upload file to bucket", func(t *testing.T) {
-		err := service.UploadFileToBucket(ctx, env.S3_BUCKET_NAME, testFile.Name(), testFileContent)
+		err := service.UploadFileToBucket(ctx, config.S3_BUCKET_NAME, testFile.Name(), testFileContent)
 		if err != nil {
 			t.Error(err)
 		}
 	})
 
 	t.Run("Get file from bucket", func(t *testing.T) {
-		fileContent, err := service.GetFileFromBucket(ctx, env.S3_BUCKET_NAME, testFile.Name())
+		fileContent, err := service.GetFileFromBucket(ctx, config.S3_BUCKET_NAME, testFile.Name())
 		if err != nil {
 			t.Error(err)
 		}
@@ -45,11 +45,11 @@ func TestStorageService(t *testing.T) {
 	})
 
 	t.Run("Delete file from bucket", func(t *testing.T) {
-		err := service.DeleteFileFromBucket(ctx, env.S3_BUCKET_NAME, testFile.Name())
+		err := service.DeleteFileFromBucket(ctx, config.S3_BUCKET_NAME, testFile.Name())
 		if err != nil {
 			t.Error(err)
 		}
-		_, err = service.GetFileFromBucket(ctx, env.S3_BUCKET_NAME, testFile.Name())
+		_, err = service.GetFileFromBucket(ctx, config.S3_BUCKET_NAME, testFile.Name())
 		if err == nil {
 			t.Error(err)
 		}

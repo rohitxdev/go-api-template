@@ -8,19 +8,19 @@ import (
 
 	"gopkg.in/gomail.v2"
 
+	"github.com/rohitxdev/go-api-template/config"
 	"github.com/rohitxdev/go-api-template/embedded"
-	"github.com/rohitxdev/go-api-template/env"
 )
 
 var smtpPort = func() uint {
-	port, err := strconv.ParseUint(env.SMTP_PORT, 10, 16)
+	port, err := strconv.ParseUint(config.SMTP_PORT, 10, 16)
 	if err != nil {
 		panic("could not parse SMTP port: " + err.Error())
 	}
 	return uint(port)
 }()
 
-var smtpDialer = gomail.NewDialer(env.SMTP_HOST, int(smtpPort), env.SMTP_USERNAME, env.SMTP_PASSWORD)
+var smtpDialer = gomail.NewDialer(config.SMTP_HOST, int(smtpPort), config.SMTP_USERNAME, config.SMTP_PASSWORD)
 
 var passwordResetTemplate = func() *template.Template {
 	tmpl, err := template.New("password-reset.tmpl").ParseFS(embedded.FS, "templates/emails/password-reset.tmpl")

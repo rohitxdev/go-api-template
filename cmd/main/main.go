@@ -9,17 +9,17 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/rohitxdev/go-api-template/config"
 	_ "github.com/rohitxdev/go-api-template/docs"
 	"github.com/rohitxdev/go-api-template/embedded"
-	"github.com/rohitxdev/go-api-template/env"
 	"github.com/rohitxdev/go-api-template/handler"
 	"github.com/rohitxdev/go-api-template/util"
 )
 
 func StartServer(e *echo.Echo) {
-	address := env.HOST + ":" + env.PORT
+	address := config.HOST + ":" + config.PORT
 
-	if env.HTTPS {
+	if config.HTTPS {
 		certFile, err := embedded.FS.ReadFile("certs/cert.pem")
 		if err != nil {
 			panic("could not read cert file:" + err.Error())

@@ -22,9 +22,9 @@ import (
 	echoSwagger "github.com/swaggo/echo-swagger"
 	"golang.org/x/time/rate"
 
+	"github.com/rohitxdev/go-api-template/config"
 	_ "github.com/rohitxdev/go-api-template/docs"
 	"github.com/rohitxdev/go-api-template/embedded"
-	"github.com/rohitxdev/go-api-template/env"
 	"github.com/rohitxdev/go-api-template/repo"
 	"github.com/rohitxdev/go-api-template/service"
 )
@@ -47,12 +47,6 @@ func RegisterRoutes(e *echo.Echo) {
 			auth.GET("/oauth2/callback/:provider", OAuth2Callback)
 		}
 
-		users := v1.Group("/users")
-		{
-			users.GET("", GetAllUsers, Auth(RoleAdmin))
-			users.GET("/me", GetMe, Auth(RoleAdmin))
-		}
-
 		files := v1.Group("/files")
 		{
 			files.GET("/:file_name", GetFile)
@@ -60,14 +54,6 @@ func RegisterRoutes(e *echo.Echo) {
 			files.POST("", PutFile)
 		}
 	}
-}
-
-type paginatedQuery struct {
-	Page uint `query:"page"`
-}
-
-func newPaginatedQuery() *paginatedQuery {
-	return &paginatedQuery{Page: 1}
 }
 
 type echoTemplate struct {
@@ -91,24 +77,11 @@ func (v *echoValidator) Validate(i any) error {
 
 var logger = service.Logger
 
-//	@title			Golang API
-//	@version		1.0
-//	@description	Golang API server.
-//	@termsOfService	http://swagger.io/terms/
-
-//	@contact.name	API Support
-//	@contact.url	http://www.swagger.io/support
-//	@contact.email	support@swagger.io
-
-//	@license.name	GNU GPL v3
-//	@license.url	https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
-
-// @host	localhost:8443
 func GetEcho() *echo.Echo {
 	e := echo.New()
 
-	if env.IS_DEV {
-		env.PrintEnv()
+	if config.IS_DEV {
+		config.PrintEnv()
 	} else {
 		e.HideBanner = true
 	}
@@ -129,7 +102,9 @@ func GetEcho() *echo.Echo {
 
 	e.Pre(middleware.Secure())
 
-	e.Pre(middleware.CORSWithConfig(middleware.CORSConfig{AllowOrigins: []string{"https://localhost"}}))
+	if config.IS_DEV {
+		e.Pre(middleware.CORSWithConfig(middleware.CORSConfig{AllowOrigins: []string{"*"}}))
+	}
 
 	e.Pre(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
 		Timeout: 5 * time.Second, Skipper: func(c echo.Context) bool {
@@ -183,14 +158,14 @@ func GetEcho() *echo.Echo {
 				Err(v.Error).
 				Msg("request")
 
-			if env.IS_DEV {
+			if config.IS_DEV {
 				fmt.Println("-------------------------------------------------------")
 			}
 			return nil
 		},
 	}))
 
-	rateLimit, err := strconv.ParseUint(env.RATE_LIMIT_PER_MINUTE, 10, 8)
+	rateLimit, err := strconv.ParseUint(config.RATE_LIMIT_PER_MINUTE, 10, 8)
 	if err != nil {
 		panic("could not parse rate limit: " + err.Error())
 	}
@@ -228,7 +203,7 @@ func GetEcho() *echo.Echo {
 				Value string
 			}{
 				{Key: "Name", Value: "Go + Echo App"},
-				{Key: "Env", Value: env.APP_ENV},
+				{Key: "Env", Value: config.APP_ENV},
 				{Key: "Host", Value: host},
 				{Key: "PID", Value: strconv.Itoa(os.Getpid())},
 				{Key: "OS", Value: runtime.GOOS},

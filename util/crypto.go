@@ -10,8 +10,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt"
-
-	"github.com/rohitxdev/go-api-template/env"
+	"github.com/rohitxdev/go-api-template/config"
 )
 
 var (
@@ -20,11 +19,11 @@ var (
 )
 
 var AccessTokenExpiresIn, RefreshTokenExpiresIn = func() (time.Duration, time.Duration) {
-	accessTokenExpiresIn, err := time.ParseDuration(env.ACCESS_TOKEN_EXPIRES_IN)
+	accessTokenExpiresIn, err := time.ParseDuration(config.ACCESS_TOKEN_EXPIRES_IN)
 	if err != nil {
 		panic("could not parse access token expiration duration: " + err.Error())
 	}
-	refreshTokenExpiresIn, err := time.ParseDuration(env.REFRESH_TOKEN_EXPIRES_IN)
+	refreshTokenExpiresIn, err := time.ParseDuration(config.REFRESH_TOKEN_EXPIRES_IN)
 	if err != nil {
 		panic("could not parse refresh token expiration duration: " + err.Error())
 	}
@@ -74,7 +73,7 @@ func DecryptAES(encryptedData []byte, key []byte) []byte {
 
 func GenerateJWT(userId uint, expiresIn time.Duration) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, jwt.StandardClaims{Id: fmt.Sprintf("%v", userId), ExpiresAt: time.Now().Add(expiresIn).Unix()})
-	tokenString, err := token.SignedString([]byte(env.JWT_SECRET))
+	tokenString, err := token.SignedString([]byte(config.JWT_SECRET))
 	if err != nil {
 		return "", fmt.Errorf("could not get signed token string: %w", err)
 	}
@@ -84,7 +83,7 @@ func GenerateJWT(userId uint, expiresIn time.Duration) (string, error) {
 func VerifyJWT(token string) (uint, error) {
 	claims := new(jwt.StandardClaims)
 	_, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (interface{}, error) {
-		return []byte(env.JWT_SECRET), nil
+		return []byte(config.JWT_SECRET), nil
 	})
 	if err != nil {
 		if err, ok := err.(*jwt.ValidationError); ok {

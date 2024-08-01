@@ -10,7 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	_ "modernc.org/sqlite"
 
-	"github.com/rohitxdev/go-api-template/env"
+	"github.com/rohitxdev/go-api-template/config"
 	"github.com/rohitxdev/go-api-template/util"
 )
 
@@ -26,7 +26,7 @@ type Paginated[T any] struct {
 /*----------------------------------- PostgreSQL Connection ----------------------------------- */
 
 var PostgresDB = func() *sql.DB {
-	db, err := sql.Open("postgres", env.DB_URL)
+	db, err := sql.Open("postgres", config.DB_URL)
 	if err != nil {
 		panic("could not connect to PostgreSQL database: " + err.Error())
 	}
@@ -48,7 +48,7 @@ var SQLiteDB = func() *sql.DB {
 /*----------------------------------- MongoDB Connection ----------------------------------- */
 
 var MongoDBClient = func() *mongo.Client {
-	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(env.MONGODB_URL))
+	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(config.MONGODB_URL))
 	if err != nil {
 		panic("could not connect to mongodb: " + err.Error())
 	}
@@ -62,9 +62,9 @@ var MongoDBClient = func() *mongo.Client {
 
 var RedisClient = func() *redis.Client {
 	client := redis.NewClient(&redis.Options{
-		Addr:     env.REDIS_HOST + ":" + env.REDIS_PORT,
-		Username: env.REDIS_USERNAME,
-		Password: env.REDIS_PASSWORD,
+		Addr:     config.REDIS_HOST + ":" + config.REDIS_PORT,
+		Username: config.REDIS_USERNAME,
+		Password: config.REDIS_PASSWORD,
 	})
 	util.RegisterCleanUp("redis connection", func() error { return client.Close() })
 	return client

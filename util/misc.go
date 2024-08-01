@@ -56,7 +56,7 @@ func SanitizeEmail(email string) string {
 
 func PrintTableJSON(jsonData []byte) {
 	jsonMap := make(map[string]any)
-	json.Unmarshal(jsonData, &jsonMap)
+	_ = json.Unmarshal(jsonData, &jsonMap)
 	count := 0
 	for key, value := range jsonMap {
 		count++

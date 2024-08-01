@@ -3,7 +3,7 @@ package service
 import (
 	amqp "github.com/rabbitmq/amqp091-go"
 
-	"github.com/rohitxdev/go-api-template/env"
+	"github.com/rohitxdev/go-api-template/config"
 	"github.com/rohitxdev/go-api-template/util"
 )
 
@@ -12,7 +12,7 @@ const (
 )
 
 func NewRabbitMQConn() (*amqp.Connection, error) {
-	conn, err := amqp.Dial(env.AMQP_URL)
+	conn, err := amqp.Dial(config.AMQP_URL)
 	if err != nil {
 		return nil, err
 	}

@@ -6,7 +6,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/rohitxdev/go-api-template/env"
+	"github.com/rohitxdev/go-api-template/config"
 	"github.com/rohitxdev/go-api-template/service"
 	"github.com/rohitxdev/go-api-template/util"
 )
@@ -20,7 +20,7 @@ func GetFile(c echo.Context) error {
 	if err := util.BindAndValidate(c, req); err != nil {
 		return err
 	}
-	file, err := service.GetFileFromBucket(c.Request().Context(), env.S3_BUCKET_NAME, req.FileName)
+	file, err := service.GetFileFromBucket(c.Request().Context(), config.S3_BUCKET_NAME, req.FileName)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
@@ -49,7 +49,7 @@ func PutFile(c echo.Context) error {
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
-	err = service.UploadFileToBucket(c.Request().Context(), env.S3_BUCKET_NAME, file.Filename, fileContent)
+	err = service.UploadFileToBucket(c.Request().Context(), config.S3_BUCKET_NAME, file.Filename, fileContent)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
@@ -57,7 +57,7 @@ func PutFile(c echo.Context) error {
 }
 
 func GetFileList(c echo.Context) error {
-	files, err := service.GetFileList(c.Request().Context(), env.S3_BUCKET_NAME, "")
+	files, err := service.GetFileList(c.Request().Context(), config.S3_BUCKET_NAME, "")
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
