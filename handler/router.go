@@ -20,13 +20,14 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/oklog/ulid/v2"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/diode"
 	echoSwagger "github.com/swaggo/echo-swagger"
 	"golang.org/x/time/rate"
 
 	_ "github.com/rohitxdev/go-api-template/docs"
 	"github.com/rohitxdev/go-api-template/embedded"
 	"github.com/rohitxdev/go-api-template/repo"
-	"github.com/rohitxdev/go-api-template/service"
 )
 
 func RegisterRoutes(e *echo.Echo, h *Handler) {
@@ -77,8 +78,6 @@ func (v *echoValidator) Validate(i any) error {
 	return nil
 }
 
-var logger = service.Logger
-
 func InitRouter(h *Handler) (*echo.Echo, error) {
 	e := echo.New()
 
@@ -119,6 +118,11 @@ func InitRouter(h *Handler) (*echo.Echo, error) {
 			return ulid.Make().String()
 		},
 	}))
+
+	asyncLogWriter := diode.NewWriter(os.Stdout, 10000, time.Millisecond*10, func(missed int) {
+		fmt.Printf("Logger dropped %d messages\n", missed)
+	})
+	logger := zerolog.New(asyncLogWriter)
 
 	e.Pre(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogHost:         true,
