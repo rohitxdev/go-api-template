@@ -32,9 +32,15 @@ func TestAES(t *testing.T) {
 	key := []byte("1234567812345678")
 	plainText := []byte("Lorem ipsum dolor sit amet, consectetur adipisicing elit. Iusto itaque error, voluptates molestiae at consequuntur minima, doloremque consequatur dolores ipsam voluptatem quaerat aliquid, adipisci rem est quia nobis ducimus neque distinctio debitis. Quo exercitationem earum, possimus velit non ullam tempora, architecto maxime rerum accusantium aliquam. Fugit laborum omnis non distinctio.")
 
-	encryptedData := util.EncryptAES(plainText, key)
-	decryptedData := util.DecryptAES(encryptedData, key)
+	encryptedData, err := util.EncryptAES(plainText, key)
+	if err != nil {
+		t.Fatal(err)
+	}
 
+	decryptedData, err := util.DecryptAES(encryptedData, key)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !bytes.Equal(plainText, decryptedData) {
 		t.Error("decryption failed")
 	}

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -22,38 +23,39 @@ import (
 	echoSwagger "github.com/swaggo/echo-swagger"
 	"golang.org/x/time/rate"
 
-	"github.com/rohitxdev/go-api-template/config"
 	_ "github.com/rohitxdev/go-api-template/docs"
 	"github.com/rohitxdev/go-api-template/embedded"
 	"github.com/rohitxdev/go-api-template/repo"
 	"github.com/rohitxdev/go-api-template/service"
 )
 
-func RegisterRoutes(e *echo.Echo) {
-	//	@BasePath	/v1
+func RegisterRoutes(e *echo.Echo, h *Handler) {
 	v1 := e.Group("/v1")
-	{
-		auth := v1.Group("/auth")
-		{
-			auth.POST("/log-in", LogIn)
-			auth.POST("/log-out", LogOut)
-			auth.POST("/sign-up", SignUp)
-			auth.POST("/forgot-password", ForgotPassword)
-			auth.GET("/reset-password", ResetPassword)
-			auth.POST("/reset-password", ResetPassword)
-			auth.GET("/access-token", GetAccessToken)
-			auth.DELETE("/delete-account", DeleteAccount, Auth(RoleUser))
-			auth.GET("/oauth2/:provider", OAuth2LogIn)
-			auth.GET("/oauth2/callback/:provider", OAuth2Callback)
-		}
 
-		files := v1.Group("/files")
-		{
-			files.GET("/:file_name", GetFile)
-			files.GET("", GetFileList)
-			files.POST("", PutFile)
-		}
-	}
+	v1.GET("/user", h.GetUser)
+	v1.GET("/quote", h.GetQuote)
+
+	// auth := v1.Group("/auth")
+	// {
+	// 	auth.POST("/log-in", LogIn)
+	// 	auth.POST("/log-out", LogOut)
+	// 	auth.POST("/sign-up", SignUp)
+	// 	auth.POST("/forgot-password", ForgotPassword)
+	// 	auth.GET("/reset-password", ResetPassword)
+	// 	auth.POST("/reset-password", ResetPassword)
+	// 	auth.GET("/access-token", GetAccessToken)
+	// 	auth.DELETE("/delete-account", DeleteAccount, Auth(RoleUser))
+	// 	auth.GET("/oauth2/:provider", OAuth2LogIn)
+	// 	auth.GET("/oauth2/callback/:provider", OAuth2Callback)
+	// }
+
+	// files := v1.Group("/files")
+	// {
+	// 	files.GET("/:file_name", GetFile)
+	// 	files.GET("", GetFileList)
+	// 	files.POST("", PutFile)
+	// }
+
 }
 
 type echoTemplate struct {
@@ -77,12 +79,10 @@ func (v *echoValidator) Validate(i any) error {
 
 var logger = service.Logger
 
-func GetEcho() *echo.Echo {
+func InitRouter(h *Handler) (*echo.Echo, error) {
 	e := echo.New()
 
-	if config.IS_DEV {
-		config.PrintEnv()
-	} else {
+	if !h.config.IS_DEV {
 		e.HideBanner = true
 	}
 
@@ -102,7 +102,7 @@ func GetEcho() *echo.Echo {
 
 	e.Pre(middleware.Secure())
 
-	if config.IS_DEV {
+	if h.config.IS_DEV {
 		e.Pre(middleware.CORSWithConfig(middleware.CORSConfig{AllowOrigins: []string{"*"}}))
 	}
 
@@ -158,16 +158,16 @@ func GetEcho() *echo.Echo {
 				Err(v.Error).
 				Msg("request")
 
-			if config.IS_DEV {
+			if h.config.IS_DEV {
 				fmt.Println("-------------------------------------------------------")
 			}
 			return nil
 		},
 	}))
 
-	rateLimit, err := strconv.ParseUint(config.RATE_LIMIT_PER_MINUTE, 10, 8)
+	rateLimit, err := strconv.ParseUint(h.config.RATE_LIMIT_PER_MINUTE, 10, 8)
 	if err != nil {
-		panic("could not parse rate limit: " + err.Error())
+		return nil, errors.Join(errors.New("could not parse rate limit"), err)
 	}
 
 	if rateLimit > 0 {
@@ -193,7 +193,7 @@ func GetEcho() *echo.Echo {
 
 	host, err := os.Hostname()
 	if err != nil {
-		panic("could not get host name: " + err.Error())
+		return nil, errors.Join(errors.New("could not get host name"), err)
 	}
 
 	e.GET("/", func(c echo.Context) error {
@@ -203,7 +203,7 @@ func GetEcho() *echo.Echo {
 				Value string
 			}{
 				{Key: "Name", Value: "Go + Echo App"},
-				{Key: "Env", Value: config.APP_ENV},
+				{Key: "Env", Value: h.config.APP_ENV},
 				{Key: "Host", Value: host},
 				{Key: "PID", Value: strconv.Itoa(os.Getpid())},
 				{Key: "OS", Value: runtime.GOOS},
@@ -211,7 +211,7 @@ func GetEcho() *echo.Echo {
 		})
 	})
 
-	RegisterRoutes(e)
+	RegisterRoutes(e, h)
 
-	return e
+	return e, nil
 }

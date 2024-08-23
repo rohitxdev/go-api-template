@@ -1,25 +1,47 @@
 package main
 
 import (
-	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
-	_ "net/http/pprof"
-
-	"github.com/labstack/echo/v4"
 
 	"github.com/rohitxdev/go-api-template/config"
-	_ "github.com/rohitxdev/go-api-template/docs"
 	"github.com/rohitxdev/go-api-template/embedded"
 	"github.com/rohitxdev/go-api-template/handler"
+	"github.com/rohitxdev/go-api-template/repo"
 	"github.com/rohitxdev/go-api-template/util"
 )
 
-func StartServer(e *echo.Echo) {
-	address := config.HOST + ":" + config.PORT
+func main() {
+	c, err := config.LoadConfig(".env")
+	if err != nil {
+		panic(err)
+	}
 
-	if config.HTTPS {
+	db, err := sql.Open("postgres", c.DB_URL)
+	if err != nil {
+		panic("could not connect to PostgreSQL database: " + err.Error())
+	}
+	defer db.Close()
+
+	r := repo.NewRepo(db)
+	h := handler.NewHandler(c, r)
+	e, err := handler.InitRouter(h)
+	if err != nil {
+		panic(err)
+	}
+
+	buildFile, err := embedded.FS.ReadFile("build.json")
+	if err != nil {
+		panic("could not read build.json file: " + err.Error())
+	}
+	fmt.Println("BUILD INFO")
+	util.PrintTableJSON(buildFile)
+
+	address := c.HOST + ":" + c.PORT
+
+	if c.HTTPS {
 		certFile, err := embedded.FS.ReadFile("certs/cert.pem")
 		if err != nil {
 			panic("could not read cert file:" + err.Error())
@@ -36,23 +58,5 @@ func StartServer(e *echo.Echo) {
 			panic("could not start HTTP server: " + err.Error())
 		}
 	}
-}
 
-func main() {
-	buildFile, err := embedded.FS.ReadFile("build.json")
-	if err != nil {
-		panic("could not read build.json file: " + err.Error())
-	}
-	fmt.Println("BUILD INFO")
-	util.PrintTableJSON(buildFile)
-
-	e := handler.GetEcho()
-
-	go StartServer(e)
-
-	util.RegisterCleanUp("server", func() error {
-		return e.Shutdown(context.TODO())
-	})
-
-	util.SetCleanUp()
 }

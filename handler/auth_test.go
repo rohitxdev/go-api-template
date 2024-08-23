@@ -2,6 +2,7 @@ package handler_test
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,11 +12,29 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/rohitxdev/go-api-template/config"
 	"github.com/rohitxdev/go-api-template/handler"
+	"github.com/rohitxdev/go-api-template/repo"
 )
 
 func TestAuth(t *testing.T) {
-	e := handler.GetEcho()
+	c, err := config.LoadConfig("../.env")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	db, err := sql.Open("postgres", c.DB_URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	r := repo.NewRepo(db)
+	h := handler.NewHandler(c, r)
+	e, err := handler.InitRouter(h)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var accessToken string
 	var refreshTokenCookie *http.Cookie
@@ -26,12 +45,12 @@ func TestAuth(t *testing.T) {
 		}
 		res := httptest.NewRecorder()
 		c := e.NewContext(req, res)
-		handler.SignUp(c)
+		_ = h.SignUp(c)
 		if res.Code != http.StatusCreated {
 			t.Error(res.Body.String())
 		}
 		var data handler.LogInResponse
-		json.Unmarshal(res.Body.Bytes(), &data)
+		_ = json.Unmarshal(res.Body.Bytes(), &data)
 		accessToken = data.AccessToken
 		for _, cookie := range res.Result().Cookies() {
 			refreshTokenCookie = cookie
@@ -48,12 +67,12 @@ func TestAuth(t *testing.T) {
 		}
 		res := httptest.NewRecorder()
 		c := e.NewContext(req, res)
-		handler.LogIn(c)
+		_ = h.LogIn(c)
 		if res.Code != http.StatusOK {
 			t.Error(res.Body.String())
 		}
 		var data handler.LogInResponse
-		json.Unmarshal(res.Body.Bytes(), &data)
+		_ = json.Unmarshal(res.Body.Bytes(), &data)
 		accessToken = data.AccessToken
 		refreshTokenCookie = nil
 		for _, cookie := range res.Result().Cookies() {
@@ -72,7 +91,7 @@ func TestAuth(t *testing.T) {
 		req.AddCookie(refreshTokenCookie)
 		res := httptest.NewRecorder()
 		c := e.NewContext(req, res)
-		handler.LogOut(c)
+		_ = h.LogOut(c)
 		if res.Code != http.StatusOK {
 			t.Error(res.Body.String())
 		}
@@ -87,9 +106,9 @@ func TestAuth(t *testing.T) {
 			t.Error(err)
 		}
 		res := httptest.NewRecorder()
-		authMiddleware := handler.Auth(handler.RoleUser)
+		authMiddleware := h.Auth(handler.RoleUser)
 		c := e.NewContext(req, res)
-		authMiddleware(handler.DeleteAccount)(c)
+		_ = authMiddleware(h.DeleteAccount)(c)
 		if res.Code != http.StatusOK {
 			t.Error(res.Body.String())
 		}

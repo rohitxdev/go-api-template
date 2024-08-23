@@ -12,41 +12,51 @@ import (
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-
-	"github.com/rohitxdev/go-api-template/config"
 )
 
 var (
 	ErrFileEmpty = errors.New("file is empty")
 )
 
-func getS3Client() *s3.Client {
+func InitS3Client(endpoint string, region string, accessKeyId string, accessKeySecret string) (*s3.Client, error) {
 	r2Resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 		return aws.Endpoint{
-			URL: config.S3_ENDPOINT,
+			URL: endpoint,
 		}, nil
 	})
 
 	cfg, err := awsConfig.LoadDefaultConfig(context.TODO(),
 		awsConfig.WithEndpointResolverWithOptions(r2Resolver),
-		awsConfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(config.AWS_ACCESS_KEY_ID, config.AWS_ACCESS_KEY_SECRET, "")),
+		awsConfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKeyId, accessKeySecret, "")),
 	)
 	if err != nil {
-		panic("could not load default config of S3 client: " + err.Error())
+		return nil, errors.Join(errors.New("could not load default config of S3 client"), err)
 	}
 
-	cfg.Region = config.S3_DEFAULT_REGION
+	cfg.Region = region
 
-	return s3.NewFromConfig(cfg)
+	return s3.NewFromConfig(cfg), nil
 }
 
-var s3Client = getS3Client()
+type FileStorage struct {
+	client *s3.Client
+}
+
+func NewFileStorage(endpoint string, region string, accessKeyId string, accessKeySecret string) (*FileStorage, error) {
+	s := new(FileStorage)
+	client, err := InitS3Client(endpoint, region, accessKeyId, accessKeySecret)
+	if err != nil {
+		return nil, err
+	}
+	s.client = client
+	return s, nil
+}
 
 /*----------------------------------- Upload File To Bucket ----------------------------------- */
 
-func UploadFileToBucket(ctx context.Context, bucketName string, fileName string, fileContent []byte) error {
+func (s *FileStorage) Upload(ctx context.Context, bucketName string, fileName string, fileContent []byte) error {
 	contentType := http.DetectContentType(fileContent)
-	_, err := s3Client.PutObject(ctx, &s3.PutObjectInput{
+	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      &bucketName,
 		Key:         &fileName,
 		Body:        bytes.NewReader(fileContent),
@@ -56,8 +66,8 @@ func UploadFileToBucket(ctx context.Context, bucketName string, fileName string,
 
 /*----------------------------------- Get File From Bucket ----------------------------------- */
 
-func GetFileFromBucket(ctx context.Context, bucketName string, fileName string) ([]byte, error) {
-	obj, err := s3Client.GetObject(ctx, &s3.GetObjectInput{Bucket: &bucketName, Key: &fileName})
+func (s *FileStorage) Get(ctx context.Context, bucketName string, fileName string) ([]byte, error) {
+	obj, err := s.client.GetObject(ctx, &s3.GetObjectInput{Bucket: &bucketName, Key: &fileName})
 	if err != nil {
 		return nil, err
 	}
@@ -77,24 +87,24 @@ func GetFileFromBucket(ctx context.Context, bucketName string, fileName string) 
 
 /*----------------------------------- Delete File From Bucket ----------------------------------- */
 
-func DeleteFileFromBucket(ctx context.Context, bucketName string, fileName string) error {
-	_, err := s3Client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: &bucketName, Key: &fileName})
+func (s *FileStorage) Delete(ctx context.Context, bucketName string, fileName string) error {
+	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: &bucketName, Key: &fileName})
 	return err
 }
 
 /*----------------------------------- Get List Of Files ----------------------------------- */
 
 type FileMetaData struct {
+	LastModified time.Time `json:"last_modified"`
 	FileName     string    `json:"file_name"`
 	SizeInBytes  uint64    `json:"size_in_bytes"`
-	LastModified time.Time `json:"last_modified"`
 }
 
-func GetFileList(ctx context.Context, bucketName string, subDir string) ([]FileMetaData, error) {
+func (s *FileStorage) GetList(ctx context.Context, bucketName string, subDir string) ([]FileMetaData, error) {
 	var continuationToken *string
 	var fileList []FileMetaData
 	for {
-		objects, err := s3Client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: &bucketName, ContinuationToken: continuationToken, Prefix: aws.String("")})
+		objects, err := s.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: &bucketName, ContinuationToken: continuationToken, Prefix: aws.String(subDir)})
 		if err != nil {
 			return nil, err
 		}

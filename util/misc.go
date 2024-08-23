@@ -11,7 +11,7 @@ import (
 	"unicode/utf8"
 )
 
-func Ternary[T any](exp bool, trueValue T, falseValue T) T {
+func Tern[T any](exp bool, trueValue T, falseValue T) T {
 	if exp {
 		return trueValue
 	}
@@ -54,13 +54,26 @@ func SanitizeEmail(email string) string {
 	return username + "@" + domain
 }
 
-func PrintTableJSON(jsonData []byte) {
+// Prints given data in table format. Accepts structs, marshalled JSON or []byte
+func PrintTableJSON(v any) {
 	jsonMap := make(map[string]any)
-	_ = json.Unmarshal(jsonData, &jsonMap)
+	if b, ok := v.([]byte); ok {
+		if err := json.Unmarshal(b, &jsonMap); err != nil {
+			fmt.Println(err)
+		}
+	} else {
+		jsonData, err := json.Marshal(v)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		_ = json.Unmarshal(jsonData, &jsonMap)
+	}
+
 	count := 0
 	for key, value := range jsonMap {
 		count++
-		s := fmt.Sprintf("| %-40.40v | %-40.40v |", key, value)
+		s := fmt.Sprintf("| %-40.40v | %-40.40v |", key, Tern(reflect.TypeOf(value).Kind() == reflect.Map, "__invalid_type__", value))
 		fmt.Println(strings.Repeat("-", utf8.RuneCountInString(s)))
 		fmt.Println(s)
 		if count == len(jsonMap) {

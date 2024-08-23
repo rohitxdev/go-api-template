@@ -9,17 +9,13 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/github"
-	"golang.org/x/oauth2/google"
 
-	"github.com/rohitxdev/go-api-template/config"
-	"github.com/rohitxdev/go-api-template/service"
 	"github.com/rohitxdev/go-api-template/util"
 )
 
 var oAuth2State = ulid.Make().String()
 
-func GetOAuth2UserEmail(c echo.Context, config *oauth2.Config, userDataEndpoint string) (string, error) {
+func (h *Handler) GetOAuth2UserEmail(c echo.Context, config *oauth2.Config, userDataEndpoint string) (string, error) {
 	code := c.FormValue("code")
 	state := c.FormValue("state")
 	if state != oAuth2State {
@@ -51,49 +47,11 @@ func GetOAuth2UserEmail(c echo.Context, config *oauth2.Config, userDataEndpoint 
 	return email, nil
 }
 
-var googleOAuth2Config = &oauth2.Config{
-	ClientID:     config.GOOGLE_CLIENT_ID,
-	ClientSecret: config.GOOGLE_CLIENT_SECRET,
-	Endpoint:     google.Endpoint,
-	RedirectURL:  "https://localhost:8443/v1/auth/oauth2/callback/google",
-	Scopes:       []string{"openid email", "openid profile"},
-}
-
-var githubOAuth2Config = &oauth2.Config{
-	ClientID:     config.GITHUB_CLIENT_ID,
-	ClientSecret: config.GITHUB_CLIENT_SECRET,
-	Endpoint:     github.Endpoint,
-	RedirectURL:  "https://localhost:8443/v1/auth/oauth2/callback/github",
-	Scopes:       []string{"read:user", "user:email"},
-}
-
-var discordEndpoint = oauth2.Endpoint{
-	AuthURL:  "https://discord.com/oauth2/authorize",
-	TokenURL: "https://discord.com/api/oauth2/token",
-}
-
-var discordOAuth2Config = &oauth2.Config{
-	ClientID:     config.DISCORD_CLIENT_ID,
-	ClientSecret: config.DISCORD_CLIENT_SECRET,
-	Endpoint:     discordEndpoint,
-	RedirectURL:  "https://localhost:8443/v1/auth/oauth2/callback/discord",
-	Scopes:       []string{"identify", "email"},
-}
-
 type OAuth2LogInRequest struct {
 	Provider string `param:"provider" validate:"required,oneof=google github discord"`
 }
 
-// @Summary		OAuth2 Login
-// @Description	Log in with OAuth2
-// @Tags			auth
-// @Accept			application/json
-// @Produce		application/json
-// @Router			/auth/oauth2/{provider} [GET]
-// @Param provider   path string true "OAuth2 provider"
-// @Success		200	object	LogInResponse
-// @Failure		500	string	any
-func OAuth2LogIn(c echo.Context) error {
+func (h *Handler) OAuth2LogIn(c echo.Context) error {
 	req := new(OAuth2LogInRequest)
 	if err := util.BindAndValidate(c, req); err != nil {
 		return err
@@ -101,11 +59,9 @@ func OAuth2LogIn(c echo.Context) error {
 
 	switch req.Provider {
 	case "google":
-		return c.Redirect(http.StatusTemporaryRedirect, googleOAuth2Config.AuthCodeURL(oAuth2State, oauth2.ApprovalForce))
+		return c.Redirect(http.StatusTemporaryRedirect, h.config.GOOGLE_OAUTH2_CONFIG.AuthCodeURL(oAuth2State, oauth2.ApprovalForce))
 	case "github":
-		return c.Redirect(http.StatusTemporaryRedirect, githubOAuth2Config.AuthCodeURL(oAuth2State, oauth2.ApprovalForce))
-	case "discord":
-		return c.Redirect(http.StatusTemporaryRedirect, discordOAuth2Config.AuthCodeURL(oAuth2State, oauth2.ApprovalForce))
+		return c.Redirect(http.StatusTemporaryRedirect, h.config.GITHUB_OAUTH2_CONFIG.AuthCodeURL(oAuth2State, oauth2.ApprovalForce))
 	default:
 		return c.String(http.StatusUnprocessableEntity, "invalid provider")
 	}
@@ -115,7 +71,7 @@ type OAuth2CallbackRequest struct {
 	Provider string `param:"provider" validate:"required,oneof=google github discord"`
 }
 
-func OAuth2Callback(c echo.Context) error {
+func (h *Handler) OAuth2Callback(c echo.Context) error {
 	req := new(OAuth2CallbackRequest)
 	if err := util.BindAndValidate(c, req); err != nil {
 		return err
@@ -126,11 +82,9 @@ func OAuth2Callback(c echo.Context) error {
 
 	switch req.Provider {
 	case "google":
-		email, err = GetOAuth2UserEmail(c, googleOAuth2Config, "https://www.googleapis.com/oauth2/v2/userinfo")
+		email, err = h.GetOAuth2UserEmail(c, h.config.GOOGLE_OAUTH2_CONFIG, "https://www.googleapis.com/oauth2/v2/userinfo")
 	case "github":
-		email, err = GetOAuth2UserEmail(c, githubOAuth2Config, "https://api.github.com/user")
-	case "discord":
-		email, err = GetOAuth2UserEmail(c, discordOAuth2Config, "https://discord.com/api/users/@me")
+		email, err = h.GetOAuth2UserEmail(c, h.config.GITHUB_OAUTH2_CONFIG, "https://api.github.com/user")
 	default:
 		return c.String(http.StatusUnprocessableEntity, "invalid provider")
 	}
@@ -139,10 +93,21 @@ func OAuth2Callback(c echo.Context) error {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
 
-	tokens, err := service.UpsertUser(c.Request().Context(), email)
+	user, err := h.repo.GetUserByEmail(c.Request().Context(), util.SanitizeEmail(email))
+	// if err != nil {
+	// if err == h.repo.ErrUserNotFound {
+	// 	tokens, err := SignUp(ctx, email, uuid.NewString())
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("could not sign up user: %s", err.Error())
+	// 	}
+	// 	return err
+	// }
+	// return  err
+	// }
+	accessToken, refreshToken := util.GenerateAccessAndRefreshTokens(uint(user.Id), h.config.ACCESS_TOKEN_EXPIRES_IN, h.config.REFRESH_TOKEN_EXPIRES_IN, h.config.JWT_SECRET)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
-	c.SetCookie(util.CreateLogInCookie(tokens.RefreshToken))
-	return c.JSON(http.StatusOK, echo.Map{"access_token": tokens.AccessToken})
+	c.SetCookie(util.CreateLogInCookie(refreshToken, h.config.REFRESH_TOKEN_EXPIRES_IN))
+	return c.JSON(http.StatusOK, echo.Map{"access_token": accessToken})
 }

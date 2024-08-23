@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt"
-	"github.com/rohitxdev/go-api-template/config"
 )
 
 var (
@@ -18,47 +17,35 @@ var (
 	ErrMalformedToken = errors.New("malformed token")
 )
 
-var AccessTokenExpiresIn, RefreshTokenExpiresIn = func() (time.Duration, time.Duration) {
-	accessTokenExpiresIn, err := time.ParseDuration(config.ACCESS_TOKEN_EXPIRES_IN)
-	if err != nil {
-		panic("could not parse access token expiration duration: " + err.Error())
-	}
-	refreshTokenExpiresIn, err := time.ParseDuration(config.REFRESH_TOKEN_EXPIRES_IN)
-	if err != nil {
-		panic("could not parse refresh token expiration duration: " + err.Error())
-	}
-	return accessTokenExpiresIn, refreshTokenExpiresIn
-}()
-
 // Encrypts data using AES algorithm. The key should be 16, 24, or 32 for 128, 192, or 256 bit encryption respectively.
-func EncryptAES(data []byte, key []byte) []byte {
+func EncryptAES(data []byte, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher([]byte(key))
 	if err != nil {
-		panic("could not create cipher block: " + err.Error())
+		return nil, errors.Join(errors.New("could not create cipher block"), err)
 	}
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		panic("could not create GCM: " + err.Error())
+		return nil, errors.Join(errors.New("could not create GCM"), err)
 	}
 	nonce := make([]byte, gcm.NonceSize())
 	_, err = rand.Read(nonce)
 	if err != nil {
-		panic("could not create nonce: " + err.Error())
+		return nil, errors.Join(errors.New("could not create nonce"), err)
 	}
 	//Append cipher to nonce and return nonce + cipher
-	return gcm.Seal(nonce, nonce, data, nil)
+	return gcm.Seal(nonce, nonce, data, nil), nil
 }
 
 // Decrypts data using AES algorithm. The key should be same key that was used to encrypt the data.
-func DecryptAES(encryptedData []byte, key []byte) []byte {
+func DecryptAES(encryptedData []byte, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher([]byte(key))
 	if err != nil {
-		panic("could not create cipher block: " + err.Error())
+		return nil, errors.Join(errors.New("could not create cipher block"), err)
 	}
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		panic("could not create GCM: " + err.Error())
+		return nil, errors.Join(errors.New("could not create GCM"), err)
 	}
 	nonceSize := gcm.NonceSize()
 
@@ -66,24 +53,24 @@ func DecryptAES(encryptedData []byte, key []byte) []byte {
 	nonce, cipher := encryptedData[:nonceSize], encryptedData[nonceSize:]
 	data, err := gcm.Open(nil, nonce, cipher, nil)
 	if err != nil {
-		panic("could not decrypt: " + err.Error())
+		return nil, errors.Join(errors.New("could not decrypt"), err)
 	}
-	return data
+	return data, nil
 }
 
-func GenerateJWT(userId uint, expiresIn time.Duration) (string, error) {
+func GenerateJWT(userId uint, expiresIn time.Duration, secret string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, jwt.StandardClaims{Id: fmt.Sprintf("%v", userId), ExpiresAt: time.Now().Add(expiresIn).Unix()})
-	tokenString, err := token.SignedString([]byte(config.JWT_SECRET))
+	tokenString, err := token.SignedString([]byte(secret))
 	if err != nil {
 		return "", fmt.Errorf("could not get signed token string: %w", err)
 	}
 	return tokenString, nil
 }
 
-func VerifyJWT(token string) (uint, error) {
+func VerifyJWT(token string, secret string) (uint, error) {
 	claims := new(jwt.StandardClaims)
 	_, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (interface{}, error) {
-		return []byte(config.JWT_SECRET), nil
+		return []byte(secret), nil
 	})
 	if err != nil {
 		if err, ok := err.(*jwt.ValidationError); ok {
@@ -100,8 +87,8 @@ func VerifyJWT(token string) (uint, error) {
 	return uint(userId), nil
 }
 
-func GenerateAccessAndRefreshTokens(userId uint) (string, string) {
-	accessToken, _ := GenerateJWT(userId, AccessTokenExpiresIn)
-	refreshToken, _ := GenerateJWT(userId, RefreshTokenExpiresIn)
+func GenerateAccessAndRefreshTokens(userId uint, accessTokenExpiry time.Duration, refreshTokenExpiry time.Duration, secret string) (string, string) {
+	accessToken, _ := GenerateJWT(userId, accessTokenExpiry, secret)
+	refreshToken, _ := GenerateJWT(userId, refreshTokenExpiry, secret)
 	return accessToken, refreshToken
 }

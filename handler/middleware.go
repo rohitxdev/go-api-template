@@ -6,7 +6,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/rohitxdev/go-api-template/repo"
 	"github.com/rohitxdev/go-api-template/util"
 )
 
@@ -28,7 +27,7 @@ type AuthRequest struct {
 	Authorization string `header:"Authorization" validate:"required,startswith=Bearer "`
 }
 
-func Auth(role role) echo.MiddlewareFunc {
+func (h *Handler) Auth(role role) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			req := new(AuthRequest)
@@ -39,11 +38,11 @@ func Auth(role role) echo.MiddlewareFunc {
 			if accessToken == "" {
 				return c.String(http.StatusUnauthorized, "invalid bearer token")
 			}
-			userId, err := util.VerifyJWT(accessToken)
+			userId, err := util.VerifyJWT(accessToken, h.config.JWT_SECRET)
 			if err != nil {
 				return c.String(http.StatusUnauthorized, err.Error())
 			}
-			user, err := repo.UserRepo.GetById(c.Request().Context(), userId)
+			user, err := h.repo.GetUserById(c.Request().Context(), userId)
 			if err != nil {
 				return c.String(http.StatusUnauthorized, err.Error())
 			}

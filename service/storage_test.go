@@ -12,14 +12,23 @@ import (
 )
 
 func TestStorageService(t *testing.T) {
+	c, err := config.LoadConfig("../.env")
+	if err != nil {
+		t.Fatal(err)
+	}
 	ctx := context.Background()
+	fs, err := service.NewFileStorage(c.S3_BUCKET_NAME, c.S3_DEFAULT_REGION, c.AWS_ACCESS_KEY_ID, c.AWS_ACCESS_KEY_SECRET)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	testFile, err := os.CreateTemp("", "test.txt")
 	if err != nil {
 		t.Error(err)
 	}
 	defer os.Remove(testFile.Name())
 	defer testFile.Close()
-	if err := os.WriteFile(testFile.Name(), []byte("lorem ipsum dorem"), 0666); err != nil {
+	if err = os.WriteFile(testFile.Name(), []byte("lorem ipsum dorem"), 0666); err != nil {
 		t.Error(err)
 	}
 	testFileContent, err := io.ReadAll(testFile)
@@ -28,14 +37,14 @@ func TestStorageService(t *testing.T) {
 	}
 
 	t.Run("Upload file to bucket", func(t *testing.T) {
-		err := service.UploadFileToBucket(ctx, config.S3_BUCKET_NAME, testFile.Name(), testFileContent)
+		err := fs.Upload(ctx, c.S3_BUCKET_NAME, testFile.Name(), testFileContent)
 		if err != nil {
 			t.Error(err)
 		}
 	})
 
 	t.Run("Get file from bucket", func(t *testing.T) {
-		fileContent, err := service.GetFileFromBucket(ctx, config.S3_BUCKET_NAME, testFile.Name())
+		fileContent, err := fs.Get(ctx, c.S3_BUCKET_NAME, testFile.Name())
 		if err != nil {
 			t.Error(err)
 		}
@@ -45,11 +54,11 @@ func TestStorageService(t *testing.T) {
 	})
 
 	t.Run("Delete file from bucket", func(t *testing.T) {
-		err := service.DeleteFileFromBucket(ctx, config.S3_BUCKET_NAME, testFile.Name())
+		err := fs.Delete(ctx, c.S3_BUCKET_NAME, testFile.Name())
 		if err != nil {
 			t.Error(err)
 		}
-		_, err = service.GetFileFromBucket(ctx, config.S3_BUCKET_NAME, testFile.Name())
+		_, err = fs.Get(ctx, c.S3_BUCKET_NAME, testFile.Name())
 		if err == nil {
 			t.Error(err)
 		}

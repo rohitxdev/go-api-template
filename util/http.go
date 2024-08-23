@@ -38,7 +38,7 @@ func CreateLogOutCookie() *http.Cookie {
 	return logOutCookie
 }
 
-func CreateLogInCookie(refreshToken string) *http.Cookie {
+func CreateLogInCookie(refreshToken string, expiresIn time.Duration) *http.Cookie {
 	return &http.Cookie{
 		Name:     "refresh_token",
 		Value:    refreshToken,
@@ -46,6 +46,6 @@ func CreateLogInCookie(refreshToken string) *http.Cookie {
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
 		Path:     "/v1/auth/refresh_token",
-		MaxAge:   int(RefreshTokenExpiresIn / time.Second),
+		MaxAge:   int(expiresIn / time.Second),
 	}
 }

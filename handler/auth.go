@@ -10,9 +10,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/rohitxdev/go-api-template/config"
 	"github.com/rohitxdev/go-api-template/repo"
-	"github.com/rohitxdev/go-api-template/service"
 	"github.com/rohitxdev/go-api-template/util"
 )
 
@@ -20,35 +18,21 @@ var (
 	ErrUserNotLoggedIn = errors.New("user is not logged in")
 )
 
-// @Summary		Get access token
-// @Description	Get access token if user is logged in
-// @Tags			auth
-// @Accept			application/json
-// @Produce		application/json
-// @Router			/auth/access-token [GET]
-// @Success		200	string	any
-// @Failure		401	string	httputil.HTTPError
-func GetAccessToken(c echo.Context) error {
+func (h *Handler) GetAccessToken(c echo.Context) error {
 	refreshToken, err := c.Cookie("refresh_token")
 	if err != nil {
 		return c.String(http.StatusUnauthorized, ErrUserNotLoggedIn.Error())
 	}
-	userId, err := util.VerifyJWT(refreshToken.Value)
+	userId, err := util.VerifyJWT(refreshToken.Value, h.config.JWT_SECRET)
 	if err != nil {
 		c.SetCookie(util.CreateLogOutCookie())
 		return c.String(http.StatusUnauthorized, err.Error())
 	}
-	accessToken, _ := util.GenerateJWT(userId, util.AccessTokenExpiresIn)
+	accessToken, _ := util.GenerateJWT(userId, h.config.ACCESS_TOKEN_EXPIRES_IN, h.config.JWT_SECRET)
 	return c.JSON(http.StatusOK, echo.Map{"access_token": accessToken})
 }
 
-// @Summary		Log out
-// @Description	Log out of application
-// @Tags			auth
-// @Produce		application/json
-// @Router			/auth/log-out [POST]
-// @Success		200
-func LogOut(c echo.Context) error {
+func (h *Handler) LogOut(c echo.Context) error {
 	_, err := c.Cookie("refresh_token")
 	if err != nil {
 		return c.String(http.StatusBadRequest, ErrUserNotLoggedIn.Error())
@@ -66,26 +50,21 @@ type LogInResponse struct {
 	AccessToken string `json:"access_token"`
 }
 
-// @Summary		Log in
-// @Description	Log into application
-// @Tags			auth
-// @Param			body	body	LogInRequest	true	"Body"
-// @Accept			application/json
-// @Produce		application/json
-// @Router			/auth/log-in [POST]
-// @Success		200	{object}	LogInResponse
-// @Failure		401	string		httputil.HTTPError
-func LogIn(c echo.Context) error {
+func (h *Handler) LogIn(c echo.Context) error {
 	req := new(LogInRequest)
 	if err := util.BindAndValidate(c, req); err != nil {
 		return err
 	}
-	tokens, err := service.LogIn(c.Request().Context(), req.Email, req.Password)
+	user, err := h.repo.GetUserByEmail(c.Request().Context(), util.SanitizeEmail(req.Email))
 	if err != nil {
+		return err
+	}
+	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		return c.String(http.StatusUnauthorized, err.Error())
 	}
-	c.SetCookie(util.CreateLogInCookie(tokens.RefreshToken))
-	return c.JSON(http.StatusOK, LogInResponse{AccessToken: tokens.AccessToken})
+	accessToken, refreshToken := util.GenerateAccessAndRefreshTokens(uint(user.Id), h.config.ACCESS_TOKEN_EXPIRES_IN, h.config.REFRESH_TOKEN_EXPIRES_IN, h.config.JWT_SECRET)
+	c.SetCookie(util.CreateLogInCookie(refreshToken, h.config.REFRESH_TOKEN_EXPIRES_IN))
+	return c.JSON(http.StatusOK, LogInResponse{AccessToken: accessToken})
 }
 
 type SignUpRequest struct {
@@ -98,32 +77,33 @@ type SignUpResponse struct {
 	AccessToken string `json:"access_token"`
 }
 
-// @Summary		Sign up
-// @Description	Sign up for application
-// @Tags			auth
-// @Accept			multipart/form-data
-// @Produce		application/json
-// @Router			/auth/sign-up [POST]
-// @Success		200	{object}	SignUpResponse
-func SignUp(c echo.Context) error {
+func (h *Handler) SignUp(c echo.Context) error {
 	req := new(SignUpRequest)
 	if err := util.BindAndValidate(c, req); err != nil {
 		return err
 	}
-	tokens, err := service.SignUp(c.Request().Context(), req.Email, req.Password)
+	user := new(repo.UserCore)
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), 12)
+	if err != nil {
+		return err
+	}
+	user.Email = util.SanitizeEmail(req.Email)
+	user.PasswordHash = string(passwordHash)
+	userId, err := h.repo.CreateUser(c.Request().Context(), user)
 	if err != nil {
 		return c.String(http.StatusBadRequest, err.Error())
 	}
-	c.SetCookie(util.CreateLogInCookie(tokens.RefreshToken))
-	return c.JSON(http.StatusCreated, SignUpResponse{AccessToken: tokens.AccessToken})
+	accessToken, refreshToken := util.GenerateAccessAndRefreshTokens(uint(userId), h.config.ACCESS_TOKEN_EXPIRES_IN, h.config.REFRESH_TOKEN_EXPIRES_IN, h.config.JWT_SECRET)
+	c.SetCookie(util.CreateLogInCookie(refreshToken, h.config.REFRESH_TOKEN_EXPIRES_IN))
+	return c.JSON(http.StatusCreated, SignUpResponse{AccessToken: accessToken})
 }
 
-func SendPasswordChangeEmail(c echo.Context) error {
+func (h *Handler) SendPasswordChangeEmail(c echo.Context) error {
 	user, ok := c.Get("user").(*repo.User)
 	if !ok {
 		return c.String(http.StatusUnauthorized, ErrUserNotLoggedIn.Error())
 	}
-	token, _ := util.GenerateJWT(user.Id, time.Minute*10)
+	token, _ := util.GenerateJWT(user.Id, time.Minute*10, h.config.JWT_SECRET)
 	u, _ := url.Parse("/v1/auth/change-password")
 	q := u.Query()
 	q.Set("token", token)
@@ -135,33 +115,25 @@ type ForgotPasswordRequest struct {
 	Email string `json:"email" validate:"required,email"`
 }
 
-// @Summary		Send password reset email
-// @Description	Send password reset email
-// @Tags			auth
-// @Param			body	body	ForgotPasswordRequest	true	"Body"
-// @Accept			application/json
-// @Produce		application/json
-// @Router			/auth/forgot-password [POST]
-// @Success		200	{object}	string
-func ForgotPassword(c echo.Context) error {
+func (h *Handler) ForgotPassword(c echo.Context) error {
 	req := new(ForgotPasswordRequest)
 	if err := util.BindAndValidate(c, req); err != nil {
 		return err
 	}
-	user, err := repo.UserRepo.GetByEmail(c.Request().Context(), util.SanitizeEmail(req.Email))
+	user, err := h.repo.GetUserByEmail(c.Request().Context(), util.SanitizeEmail(req.Email))
 	if err != nil {
 		if errors.Is(err, repo.ErrUserNotFound) {
 			return c.String(http.StatusNotFound, repo.ErrUserNotFound.Error())
 		}
 		return c.String(http.StatusInternalServerError, echo.ErrInternalServerError.Error())
 	}
-	token, _ := util.GenerateJWT(user.Id, time.Minute*10)
-	u, _ := url.Parse(fmt.Sprintf("https://%s:%s/v1/auth/reset-password", config.HOST, config.PORT))
+	token, _ := util.GenerateJWT(user.Id, time.Minute*10, h.config.JWT_SECRET)
+	u, _ := url.Parse(fmt.Sprintf("https://%s:%s/v1/auth/reset-password", h.config.HOST, h.config.PORT))
 	q := u.Query()
 	q.Set("token", token)
 	u.RawQuery = q.Encode()
 	go func() {
-		service.SendPasswordResetLink(u.String(), user.Email)
+		_ = h.email.SendPasswordResetLink(u.String(), user.Email)
 	}()
 	return c.String(http.StatusOK, "sent password reset link to email")
 }
@@ -171,16 +143,16 @@ type ResetPasswordRequest struct {
 	NewPassword string `form:"new_password" validate:"required,min=8,max=512"`
 }
 
-func ResetPassword(c echo.Context) error {
+func (h *Handler) ResetPassword(c echo.Context) error {
 	req := new(ResetPasswordRequest)
 	if err := util.BindAndValidate(c, req); err != nil {
 		return err
 	}
-	userId, err := util.VerifyJWT(req.Token)
+	userId, err := util.VerifyJWT(req.Token, h.config.JWT_SECRET)
 	if err != nil {
 		return c.String(http.StatusBadRequest, err.Error())
 	}
-	_, err = repo.UserRepo.GetById(c.Request().Context(), userId)
+	_, err = h.repo.GetUserById(c.Request().Context(), userId)
 	if errors.Is(err, repo.ErrUserNotFound) {
 		return c.String(http.StatusNotFound, repo.ErrUserNotFound.Error())
 	}
@@ -188,7 +160,7 @@ func ResetPassword(c echo.Context) error {
 		return c.Render(http.StatusOK, "change-password.tmpl", nil)
 	} else {
 		hash, _ := bcrypt.GenerateFromPassword([]byte(req.NewPassword), 12)
-		err := repo.UserRepo.Update(c.Request().Context(), userId, map[string]any{
+		err := h.repo.Update(c.Request().Context(), userId, map[string]any{
 			"password_hash": string(hash),
 		})
 		if err != nil {
@@ -198,12 +170,12 @@ func ResetPassword(c echo.Context) error {
 	}
 }
 
-func DeleteAccount(c echo.Context) error {
+func (h *Handler) DeleteAccount(c echo.Context) error {
 	user, ok := c.Get("user").(*repo.User)
 	if !ok {
 		return c.String(http.StatusUnauthorized, ErrUserNotLoggedIn.Error())
 	}
-	if err := repo.UserRepo.DeleteById(c.Request().Context(), user.Id); err != nil {
+	if err := h.repo.DeleteUserById(c.Request().Context(), user.Id); err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
 	return c.String(http.StatusOK, "deleted account successfully")

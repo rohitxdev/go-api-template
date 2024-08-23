@@ -6,8 +6,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/rohitxdev/go-api-template/config"
-	"github.com/rohitxdev/go-api-template/service"
 	"github.com/rohitxdev/go-api-template/util"
 )
 
@@ -15,12 +13,12 @@ type getFileRequest struct {
 	FileName string `param:"file_name" validate:"required"`
 }
 
-func GetFile(c echo.Context) error {
+func (h *Handler) GetFile(c echo.Context) error {
 	req := new(getFileRequest)
 	if err := util.BindAndValidate(c, req); err != nil {
 		return err
 	}
-	file, err := service.GetFileFromBucket(c.Request().Context(), config.S3_BUCKET_NAME, req.FileName)
+	file, err := h.fs.Get(c.Request().Context(), h.config.S3_BUCKET_NAME, req.FileName)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
@@ -31,7 +29,7 @@ type putFileRequest struct {
 	File string `form:"file" validate:"required"`
 }
 
-func PutFile(c echo.Context) error {
+func (h *Handler) PutFile(c echo.Context) error {
 	req := new(putFileRequest)
 	if err := util.BindAndValidate(c, req); err != nil {
 		return err
@@ -49,15 +47,15 @@ func PutFile(c echo.Context) error {
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
-	err = service.UploadFileToBucket(c.Request().Context(), config.S3_BUCKET_NAME, file.Filename, fileContent)
+	err = h.fs.Upload(c.Request().Context(), h.config.S3_BUCKET_NAME, file.Filename, fileContent)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
 	return c.NoContent(http.StatusOK)
 }
 
-func GetFileList(c echo.Context) error {
-	files, err := service.GetFileList(c.Request().Context(), config.S3_BUCKET_NAME, "")
+func (h *Handler) GetFileList(c echo.Context) error {
+	files, err := h.fs.GetList(c.Request().Context(), h.config.S3_BUCKET_NAME, "")
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}

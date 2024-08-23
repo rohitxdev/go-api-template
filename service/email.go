@@ -4,23 +4,15 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
-	"strconv"
 
 	"gopkg.in/gomail.v2"
 
-	"github.com/rohitxdev/go-api-template/config"
 	"github.com/rohitxdev/go-api-template/embedded"
 )
 
-var smtpPort = func() uint {
-	port, err := strconv.ParseUint(config.SMTP_PORT, 10, 16)
-	if err != nil {
-		panic("could not parse SMTP port: " + err.Error())
-	}
-	return uint(port)
-}()
-
-var smtpDialer = gomail.NewDialer(config.SMTP_HOST, int(smtpPort), config.SMTP_USERNAME, config.SMTP_PASSWORD)
+func NewSMTPClient(host string, port int, username string, password string) *gomail.Dialer {
+	return gomail.NewDialer(host, port, username, password)
+}
 
 var passwordResetTemplate = func() *template.Template {
 	tmpl, err := template.New("password-reset.tmpl").ParseFS(embedded.FS, "templates/emails/password-reset.tmpl")
@@ -29,6 +21,10 @@ var passwordResetTemplate = func() *template.Template {
 	}
 	return tmpl
 }()
+
+type EmailClient struct {
+	dialer *gomail.Dialer
+}
 
 /*----------------------------------- Send Email ----------------------------------- */
 
@@ -43,7 +39,7 @@ type Email struct {
 	FromName    string
 }
 
-func SendEmail(email *Email) error {
+func (e *EmailClient) SendEmail(email *Email) error {
 	msg := gomail.NewMessage()
 	msg.SetHeaders(map[string][]string{
 		"From":    {msg.FormatAddress(email.FromAddress, email.FromName)},
@@ -53,7 +49,7 @@ func SendEmail(email *Email) error {
 		"Bcc":     email.Bcc,
 	})
 	msg.SetBody(email.ContentType, email.Body)
-	if err := smtpDialer.DialAndSend(msg); err != nil {
+	if err := e.dialer.DialAndSend(msg); err != nil {
 		return fmt.Errorf("could not send email: %w", err)
 	}
 	return nil
@@ -61,13 +57,13 @@ func SendEmail(email *Email) error {
 
 /*----------------------------------- Send Password Reset Link ----------------------------------- */
 
-func SendPasswordResetLink(urlWithToken string, toEmail string) error {
+func (e *EmailClient) SendPasswordResetLink(urlWithToken string, toEmail string) error {
 	var buf bytes.Buffer
 	err := passwordResetTemplate.Execute(&buf, map[string]any{"URL": urlWithToken})
 	if err != nil {
 		return fmt.Errorf("could not execute password reset template: %w", err)
 	}
-	if err := SendEmail(&Email{
+	if err := e.SendEmail(&Email{
 		ToAddresses: []string{toEmail},
 		Subject:     "Password Reset",
 		Body:        buf.String(),
