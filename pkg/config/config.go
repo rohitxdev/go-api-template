@@ -71,8 +71,8 @@ func PrintConfig(c Config) {
 }
 
 func LoadConfig(envFilePath string) (*Config, error) {
-	if err := godotenv.Overload(envFilePath); err != nil {
-		return nil, errors.Join(errors.New("could not load env file"), err)
+	if err := godotenv.Load(envFilePath); err != nil {
+		fmt.Println("warning: could not load config file: " + err.Error())
 	}
 
 	accessTokenExpiresIn, err := time.ParseDuration(os.Getenv("ACCESS_TOKEN_EXPIRES_IN"))
@@ -130,7 +130,7 @@ func LoadConfig(envFilePath string) (*Config, error) {
 	}
 
 	if err := validator.New().Struct(c); err != nil {
-		return nil, errors.Join(errors.New("config validation failed"), err)
+		return nil, errors.Join(errors.New("could not validate config"), err)
 	}
 
 	if c.GOOGLE_CLIENT_ID != "" && c.GOOGLE_CLIENT_SECRET != "" {

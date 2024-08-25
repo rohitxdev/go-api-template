@@ -178,7 +178,7 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 				slog.String("method", v.Method),
 				slog.Int("status", v.Status),
 				slog.Duration("latency_ms", v.Latency.Round(time.Millisecond)),
-				slog.Int64("res_size_bytes", v.ResponseSize),
+				slog.Int64("res_bytes", v.ResponseSize),
 				slog.String("user_agent", v.UserAgent),
 				slog.String("referer", v.Referer),
 				slog.String("req_id", v.RequestID),

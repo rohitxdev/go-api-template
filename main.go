@@ -23,7 +23,7 @@ var staticFS embed.FS
 func main() {
 	c, err := config.LoadConfig(".env")
 	if err != nil {
-		panic(err)
+		panic("could not load config: " + err.Error())
 	}
 
 	db, err := sql.Open("postgres", c.DB_URL)
@@ -37,7 +37,7 @@ func main() {
 
 	e, err := handler.NewRouter(h)
 	if err != nil {
-		panic(err)
+		panic("could not create router: " + err.Error())
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
