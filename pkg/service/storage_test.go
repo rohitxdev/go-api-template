@@ -12,7 +12,7 @@ import (
 )
 
 func TestStorageService(t *testing.T) {
-	c, err := config.LoadConfig("../.env")
+	c, err := config.Load("../.env")
 	if err != nil {
 		t.Fatal(err)
 	}

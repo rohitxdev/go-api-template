@@ -21,7 +21,7 @@ import (
 var staticFS embed.FS
 
 func main() {
-	c, err := config.LoadConfig(".env")
+	c, err := config.Load(".env")
 	if err != nil {
 		panic("could not load config: " + err.Error())
 	}
@@ -32,8 +32,8 @@ func main() {
 	}
 	defer db.Close()
 
-	r := repo.NewRepo(db)
-	h := handler.NewHandler(c, r, &staticFS)
+	r := repo.New(db)
+	h := handler.New(c, r, &staticFS)
 
 	e, err := handler.NewRouter(h)
 	if err != nil {

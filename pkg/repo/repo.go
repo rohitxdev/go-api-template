@@ -8,7 +8,7 @@ type Repo struct {
 	db *sql.DB
 }
 
-func NewRepo(db *sql.DB) *Repo {
+func New(db *sql.DB) *Repo {
 	repo := new(Repo)
 	repo.db = db
 	return repo

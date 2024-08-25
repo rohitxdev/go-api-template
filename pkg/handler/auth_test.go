@@ -17,7 +17,7 @@ import (
 )
 
 func TestAuth(t *testing.T) {
-	c, err := config.LoadConfig("../.env")
+	c, err := config.Load("../.env")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,8 +28,8 @@ func TestAuth(t *testing.T) {
 	}
 	defer db.Close()
 
-	r := repo.NewRepo(db)
-	h := handler.NewHandler(c, r, nil)
+	r := repo.New(db)
+	h := handler.New(c, r, nil)
 	e, err := handler.NewRouter(h)
 	if err != nil {
 		t.Fatal(err)

@@ -53,7 +53,7 @@ type Config struct {
 	IS_DEV                   bool
 }
 
-func PrintConfig(c Config) {
+func Print(c Config) {
 	x := reflect.ValueOf(c)
 	fmt.Println()
 	fmt.Println("ENVIRONMENT VARIABLES")
@@ -70,7 +70,7 @@ func PrintConfig(c Config) {
 	fmt.Println()
 }
 
-func LoadConfig(envFilePath string) (*Config, error) {
+func Load(envFilePath string) (*Config, error) {
 	if err := godotenv.Load(envFilePath); err != nil {
 		fmt.Println("warning: could not load config file: " + err.Error())
 	}

@@ -16,7 +16,7 @@ type Handler struct {
 	staticFS *embed.FS
 }
 
-func NewHandler(c *config.Config, r *repo.Repo, staticFS *embed.FS) *Handler {
+func New(c *config.Config, r *repo.Repo, staticFS *embed.FS) *Handler {
 	return &Handler{
 		config:   c,
 		repo:     r,
