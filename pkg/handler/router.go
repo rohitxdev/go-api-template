@@ -17,10 +17,9 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/lmittmann/tint"
-	"github.com/oklog/ulid/v2"
 	"github.com/rohitxdev/go-api-template/pkg/repo"
 	"github.com/rohitxdev/go-api-template/pkg/util"
-	echoSwagger "github.com/swaggo/echo-swagger"
+	"github.com/rs/xid"
 	"golang.org/x/time/rate"
 
 	"github.com/goccy/go-json"
@@ -48,8 +47,9 @@ func (h *Handler) RegisterRoutes(e *echo.Echo) {
 		files.GET("", h.GetFileList)
 		files.POST("", h.PutFile)
 	}
-
 }
+
+// Custom view renderer
 
 type echoTemplate struct {
 	templates *template.Template
@@ -58,6 +58,8 @@ type echoTemplate struct {
 func (t echoTemplate) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
 	return t.templates.ExecuteTemplate(w, name, data)
 }
+
+// Custom request validator
 
 type echoValidator struct {
 	validator *validator.Validate
@@ -69,6 +71,8 @@ func (v echoValidator) Validate(i any) error {
 	}
 	return nil
 }
+
+// Custom JSON serializer & deserializer
 
 type echoJSONSerializer struct{}
 
@@ -103,12 +107,13 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 		templates: template.Must(template.ParseFS(h.staticFS, "templates/**/*.tmpl")),
 	}
 
-	e.Validator = echoValidator{validator: validator.New()}
+	e.Validator = echoValidator{
+		validator: validator.New(),
+	}
 
 	e.Pre(middleware.StaticWithConfig(middleware.StaticConfig{
 		Root:       "public",
 		Filesystem: http.FS(h.staticFS),
-		HTML5:      true,
 	}))
 
 	e.Pre(middleware.Recover())
@@ -119,33 +124,35 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 		e.Pre(middleware.CORSWithConfig(middleware.CORSConfig{AllowOrigins: []string{"*"}}))
 	}
 
+	e.Pre(middleware.CSRF())
+
 	e.Pre(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
 		Timeout: 5 * time.Second, Skipper: func(c echo.Context) bool {
 			return strings.HasPrefix(c.Request().URL.Path, "/debug/pprof")
 		},
 	}))
 
-	e.GET("/swagger/*", echoSwagger.WrapHandler)
-
 	e.Pre(middleware.RequestIDWithConfig(middleware.RequestIDConfig{
 		Generator: func() string {
-			return ulid.Make().String()
+			return xid.New().String()
 		},
 	}))
+
+	// Logger
 
 	logOpts := tint.Options{
 		TimeFormat: util.Tern(h.config.IS_DEV, time.Kitchen, time.RFC3339),
 		Level:      slog.LevelDebug,
+		AddSource:  true,
+		NoColor:    !h.config.IS_DEV,
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 			if a.Value.String() == "" || a.Value.Equal(slog.AnyValue(nil)) {
 				return slog.Attr{}
 			}
 			return a
 		},
-		AddSource: true,
-		NoColor:   !h.config.IS_DEV,
 	}
-	logger := slog.New(tint.NewHandler(os.Stdout, &logOpts))
+	logger := slog.New(tint.NewHandler(os.Stderr, &logOpts))
 
 	e.Pre(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogHost:         true,
@@ -172,7 +179,7 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 				slog.LevelInfo,
 				"request",
 				slog.String("host", v.Host),
-				slog.String("client_ip", v.RemoteIP),
+				slog.String("req_ip", v.RemoteIP),
 				slog.String("protocol", v.Protocol),
 				slog.String("uri", v.URI),
 				slog.String("method", v.Method),
@@ -181,7 +188,7 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 				slog.Int64("res_bytes", v.ResponseSize),
 				slog.String("user_agent", v.UserAgent),
 				slog.String("referer", v.Referer),
-				slog.String("req_id", v.RequestID),
+				slog.String("id", v.RequestID),
 				slog.Int("user_id", int(userId)),
 				slog.Any("error", v.Error),
 			)
@@ -190,7 +197,7 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 		},
 	}))
 
-	if h.config.RATE_LIMIT_PER_MINUTE >= 0 {
+	if h.config.RATE_LIMIT_PER_MINUTE > 0 {
 		e.Pre(middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
 			Store: middleware.NewRateLimiterMemoryStoreWithConfig(middleware.RateLimiterMemoryStoreConfig{
 				Rate:      rate.Limit(h.config.RATE_LIMIT_PER_MINUTE),
@@ -198,8 +205,10 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 			})}))
 	}
 
+	// Gzip compression & decompression
+
 	e.Use(middleware.GzipWithConfig(middleware.GzipConfig{Skipper: func(c echo.Context) bool {
-		return !strings.Contains(c.Request().Header.Get("Accept-Encoding"), "gzip") || strings.HasSuffix(c.Request().URL.Path, "/metrics") || strings.HasSuffix(c.Request().URL.Path, "/swagger")
+		return !strings.Contains(c.Request().Header.Get("Accept-Encoding"), "gzip")
 	}}))
 
 	e.Pre(middleware.Decompress())
