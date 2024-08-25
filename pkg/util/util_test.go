@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/rohitxdev/go-api-template/util"
+	"github.com/rohitxdev/go-api-template/pkg/util"
 )
 
 func TestReverseString(t *testing.T) {

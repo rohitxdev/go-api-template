@@ -1,12 +1,66 @@
-version: "3"
 services:
-  rabbitmq:
-    image: rabbitmq:3-management
-    ports:
-      - "5672:5672"
-      - "15672:15672"
+  api:
+    build:
+      context: .
+      target: dev
+      args:
+        GO_VERSION: ${GO_VERSION}
     volumes:
-      - rabbitmq_data:/data
+      - .:/app
+    ports:
+      - 8443:8443
+    depends_on:
+      - mongodb
+      - minio
+    env_file:
+      - ${ENV_FILE}
+    environment:
+      APP_ENV: development
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+    
+  mongodb:
+    image: mongo
+    ports:
+      - 27017:27017
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: rootuser
+      MONGO_INITDB_ROOT_PASSWORD: rootuser
+    restart: unless-stopped
+    volumes:
+      - mongodb-volume-dev:/data/db
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+  
+  minio:
+    image: minio/minio
+    ports:
+      - 9000:9000
+      - 9001:9001
+    environment:
+      MINIO_ROOT_USER: rootuser
+      MINIO_ROOT_PASSWORD: rootuser
+      MINIO_CONSOLE_ADDRESS: :9001
+    restart: unless-stopped
+    volumes:
+      - minio-volume-dev:/data
+    command: server /data
+
+  nats-queue:
+    image: nats
+    ports:
+      - 4222:4222
+      - 8222:8222
+
+
 volumes:
-  rabbitmq_data:
+  mongodb-volume-dev:
+  minio-volume-dev:
+
+
+
     

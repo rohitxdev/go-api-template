@@ -8,9 +8,8 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/oklog/ulid/v2"
+	"github.com/rohitxdev/go-api-template/pkg/util"
 	"golang.org/x/oauth2"
-
-	"github.com/rohitxdev/go-api-template/util"
 )
 
 var oAuth2State = ulid.Make().String()

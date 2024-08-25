@@ -5,8 +5,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-
-	"github.com/rohitxdev/go-api-template/util"
+	"github.com/rohitxdev/go-api-template/pkg/util"
 )
 
 type getFileRequest struct {

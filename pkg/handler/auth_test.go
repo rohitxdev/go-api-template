@@ -11,10 +11,9 @@ import (
 	"testing"
 
 	"github.com/labstack/echo/v4"
-
-	"github.com/rohitxdev/go-api-template/config"
-	"github.com/rohitxdev/go-api-template/handler"
-	"github.com/rohitxdev/go-api-template/repo"
+	"github.com/rohitxdev/go-api-template/pkg/config"
+	"github.com/rohitxdev/go-api-template/pkg/handler"
+	"github.com/rohitxdev/go-api-template/pkg/repo"
 )
 
 func TestAuth(t *testing.T) {
@@ -30,8 +29,8 @@ func TestAuth(t *testing.T) {
 	defer db.Close()
 
 	r := repo.NewRepo(db)
-	h := handler.NewHandler(c, r)
-	e, err := handler.InitRouter(h)
+	h := handler.NewHandler(c, r, nil)
+	e, err := handler.NewRouter(h)
 	if err != nil {
 		t.Fatal(err)
 	}

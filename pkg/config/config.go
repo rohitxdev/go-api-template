@@ -23,7 +23,6 @@ type Config struct {
 	HOST                     string `validate:"required,ip"`
 	PORT                     string `validate:"required,gte=0"`
 	JWT_SECRET               string `validate:"required"`
-	RATE_LIMIT_PER_MINUTE    string `validate:"required"`
 	TLS_CERT_PATH            string `validate:"required,filepath"`
 	TLS_KEY_PATH             string `validate:"required,filepath"`
 	APP_ENV                  string `validate:"required,oneof=development production"`
@@ -49,8 +48,8 @@ type Config struct {
 	AMQP_URL                 string
 	ACCESS_TOKEN_EXPIRES_IN  time.Duration `validate:"required"`
 	REFRESH_TOKEN_EXPIRES_IN time.Duration `validate:"required"`
+	RATE_LIMIT_PER_MINUTE    int           `validate:"required"`
 	SMTP_PORT                int           `validate:"required"`
-	HTTPS                    bool
 	IS_DEV                   bool
 }
 
@@ -91,12 +90,16 @@ func LoadConfig(envFilePath string) (*Config, error) {
 		return nil, errors.Join(errors.New("could not parse SMTP port"), err)
 	}
 
+	rateLimitPerMinute, err := strconv.ParseInt(os.Getenv("RATE_LIMIT_PER_MINUTE"), 10, 8)
+	if err != nil {
+		return nil, errors.Join(errors.New("could not parse rate limit"), err)
+	}
+
 	c := Config{
 		APP_ENV:                  os.Getenv("APP_ENV"),
 		HOST:                     os.Getenv("HOST"),
 		PORT:                     os.Getenv("PORT"),
 		JWT_SECRET:               os.Getenv("JWT_SECRET"),
-		RATE_LIMIT_PER_MINUTE:    os.Getenv("RATE_LIMIT_PER_MINUTE"),
 		TLS_CERT_PATH:            os.Getenv("TLS_CERT_PATH"),
 		TLS_KEY_PATH:             os.Getenv("TLS_KEY_PATH"),
 		DB_URL:                   os.Getenv("DB_URL"),
@@ -121,8 +124,8 @@ func LoadConfig(envFilePath string) (*Config, error) {
 		AMQP_URL:                 os.Getenv("AMQP_URL"),
 		ACCESS_TOKEN_EXPIRES_IN:  accessTokenExpiresIn,
 		REFRESH_TOKEN_EXPIRES_IN: refreshTokenExpiresIn,
+		RATE_LIMIT_PER_MINUTE:    int(rateLimitPerMinute),
 		SMTP_PORT:                int(smtpPort),
-		HTTPS:                    os.Getenv("HTTPS") == "true",
 		IS_DEV:                   os.Getenv("APP_ENV") != "production",
 	}
 

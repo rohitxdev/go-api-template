@@ -5,38 +5,30 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"log/slog"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
-	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
-	echoPrometheus "github.com/globocom/echo-prometheus"
 	"github.com/go-playground/validator"
 	"github.com/labstack/echo-contrib/pprof"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/lmittmann/tint"
 	"github.com/oklog/ulid/v2"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/diode"
+	"github.com/rohitxdev/go-api-template/pkg/repo"
+	"github.com/rohitxdev/go-api-template/pkg/util"
 	echoSwagger "github.com/swaggo/echo-swagger"
 	"golang.org/x/time/rate"
 
-	_ "github.com/rohitxdev/go-api-template/docs"
-	"github.com/rohitxdev/go-api-template/embedded"
-	"github.com/rohitxdev/go-api-template/repo"
+	"github.com/goccy/go-json"
 )
 
-func RegisterRoutes(e *echo.Echo, h *Handler) {
+func (h *Handler) RegisterRoutes(e *echo.Echo) {
 	v1 := e.Group("/v1")
 
-	v1.GET("/user", h.GetUser)
-	v1.GET("/quote", h.GetQuote)
-
-	// auth := v1.Group("/auth")
 	// {
 	// 	auth.POST("/log-in", LogIn)
 	// 	auth.POST("/log-out", LogOut)
@@ -50,12 +42,12 @@ func RegisterRoutes(e *echo.Echo, h *Handler) {
 	// 	auth.GET("/oauth2/callback/:provider", OAuth2Callback)
 	// }
 
-	// files := v1.Group("/files")
-	// {
-	// 	files.GET("/:file_name", GetFile)
-	// 	files.GET("", GetFileList)
-	// 	files.POST("", PutFile)
-	// }
+	files := v1.Group("/files")
+	{
+		files.GET("/:file_name", h.GetFile)
+		files.GET("", h.GetFileList)
+		files.POST("", h.PutFile)
+	}
 
 }
 
@@ -63,7 +55,7 @@ type echoTemplate struct {
 	templates *template.Template
 }
 
-func (t *echoTemplate) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
+func (t echoTemplate) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
 	return t.templates.ExecuteTemplate(w, name, data)
 }
 
@@ -71,29 +63,51 @@ type echoValidator struct {
 	validator *validator.Validate
 }
 
-func (v *echoValidator) Validate(i any) error {
+func (v echoValidator) Validate(i any) error {
 	if err := v.validator.Struct(i); err != nil {
 		return echo.NewHTTPError(http.StatusUnprocessableEntity, err)
 	}
 	return nil
 }
 
-func InitRouter(h *Handler) (*echo.Echo, error) {
+type echoJSONSerializer struct{}
+
+func (s echoJSONSerializer) Serialize(c echo.Context, i interface{}, indent string) error {
+	enc := json.NewEncoder(c.Response())
+	if indent != "" {
+		enc.SetIndent("", indent)
+	}
+	return enc.Encode(i)
+}
+
+func (s echoJSONSerializer) Deserialize(c echo.Context, i interface{}) error {
+	err := json.NewDecoder(c.Request().Body).Decode(i)
+	if ute, ok := err.(*json.UnmarshalTypeError); ok {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Unmarshal type error: expected=%v, got=%v, field=%v, offset=%v", ute.Type, ute.Value, ute.Field, ute.Offset)).SetInternal(err)
+	} else if se, ok := err.(*json.SyntaxError); ok {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Syntax error: offset=%v, error=%v", se.Offset, se.Error())).SetInternal(err)
+	}
+	return err
+}
+
+func NewRouter(h *Handler) (*echo.Echo, error) {
 	e := echo.New()
 
 	if !h.config.IS_DEV {
 		e.HideBanner = true
 	}
 
-	e.Renderer = &echoTemplate{
-		templates: template.Must(template.ParseFS(embedded.FS, "templates/**/*.tmpl")),
+	e.JSONSerializer = echoJSONSerializer{}
+
+	e.Renderer = echoTemplate{
+		templates: template.Must(template.ParseFS(h.staticFS, "templates/**/*.tmpl")),
 	}
 
-	e.Validator = &echoValidator{validator: validator.New()}
+	e.Validator = echoValidator{validator: validator.New()}
 
 	e.Pre(middleware.StaticWithConfig(middleware.StaticConfig{
 		Root:       "public",
-		Filesystem: http.FS(embedded.FS),
+		Filesystem: http.FS(h.staticFS),
 		HTML5:      true,
 	}))
 
@@ -119,10 +133,19 @@ func InitRouter(h *Handler) (*echo.Echo, error) {
 		},
 	}))
 
-	asyncLogWriter := diode.NewWriter(os.Stdout, 10000, time.Millisecond*10, func(missed int) {
-		fmt.Printf("Logger dropped %d messages\n", missed)
-	})
-	logger := zerolog.New(asyncLogWriter)
+	logOpts := tint.Options{
+		TimeFormat: util.Tern(h.config.IS_DEV, time.Kitchen, time.RFC3339),
+		Level:      slog.LevelDebug,
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if a.Value.String() == "" || a.Value.Equal(slog.AnyValue(nil)) {
+				return slog.Attr{}
+			}
+			return a
+		},
+		AddSource: true,
+		NoColor:   !h.config.IS_DEV,
+	}
+	logger := slog.New(tint.NewHandler(os.Stdout, &logOpts))
 
 	e.Pre(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogHost:         true,
@@ -144,40 +167,33 @@ func InitRouter(h *Handler) (*echo.Echo, error) {
 				userId = user.Id
 			}
 
-			logger.Info().
-				Ctx(c.Request().Context()).
-				Time("timestamp", v.StartTime).
-				Str("host", v.Host).
-				Str("client_ip", v.RemoteIP).
-				Str("protocol", v.Protocol).
-				Str("uri", v.URI).
-				Str("method", v.Method).
-				Int("status", v.Status).
-				Dur("latency_ms", v.Latency.Round(time.Millisecond)).
-				Int64("res_size_bytes", v.ResponseSize).
-				Str("user_agent", v.UserAgent).
-				Str("referer", v.Referer).
-				Str("req_id", v.RequestID).
-				Uint("user_id", userId).
-				Err(v.Error).
-				Msg("request")
+			logger.LogAttrs(
+				c.Request().Context(),
+				slog.LevelInfo,
+				"request",
+				slog.String("host", v.Host),
+				slog.String("client_ip", v.RemoteIP),
+				slog.String("protocol", v.Protocol),
+				slog.String("uri", v.URI),
+				slog.String("method", v.Method),
+				slog.Int("status", v.Status),
+				slog.Duration("latency_ms", v.Latency.Round(time.Millisecond)),
+				slog.Int64("res_size_bytes", v.ResponseSize),
+				slog.String("user_agent", v.UserAgent),
+				slog.String("referer", v.Referer),
+				slog.String("req_id", v.RequestID),
+				slog.Int("user_id", int(userId)),
+				slog.Any("error", v.Error),
+			)
 
-			if h.config.IS_DEV {
-				fmt.Println("-------------------------------------------------------")
-			}
 			return nil
 		},
 	}))
 
-	rateLimit, err := strconv.ParseUint(h.config.RATE_LIMIT_PER_MINUTE, 10, 8)
-	if err != nil {
-		return nil, errors.Join(errors.New("could not parse rate limit"), err)
-	}
-
-	if rateLimit > 0 {
+	if h.config.RATE_LIMIT_PER_MINUTE >= 0 {
 		e.Pre(middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
 			Store: middleware.NewRateLimiterMemoryStoreWithConfig(middleware.RateLimiterMemoryStoreConfig{
-				Rate:      rate.Limit(rateLimit),
+				Rate:      rate.Limit(h.config.RATE_LIMIT_PER_MINUTE),
 				ExpiresIn: time.Minute,
 			})}))
 	}
@@ -188,11 +204,6 @@ func InitRouter(h *Handler) (*echo.Echo, error) {
 
 	e.Pre(middleware.Decompress())
 
-	//Do not use e.Pre() method for prometheuse middleware as it will show inaccurate metrics
-	e.Use(echoPrometheus.MetricsMiddleware())
-
-	e.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
-
 	pprof.Register(e)
 
 	host, err := os.Hostname()
@@ -200,22 +211,20 @@ func InitRouter(h *Handler) (*echo.Echo, error) {
 		return nil, errors.Join(errors.New("could not get host name"), err)
 	}
 
+	data := map[string]string{
+		"env":  h.config.APP_ENV,
+		"host": host,
+	}
+
 	e.GET("/", func(c echo.Context) error {
-		return c.Render(http.StatusOK, "home.tmpl", echo.Map{
-			"Data": []struct {
-				Key   string
-				Value string
-			}{
-				{Key: "Name", Value: "Go + Echo App"},
-				{Key: "Env", Value: h.config.APP_ENV},
-				{Key: "Host", Value: host},
-				{Key: "PID", Value: strconv.Itoa(os.Getpid())},
-				{Key: "OS", Value: runtime.GOOS},
-			},
-		})
+		return c.Render(http.StatusOK, "home.tmpl", data)
 	})
 
-	RegisterRoutes(e, h)
+	e.GET("/ping", func(c echo.Context) error {
+		return c.String(http.StatusOK, "pong")
+	})
+
+	h.RegisterRoutes(e)
 
 	return e, nil
 }

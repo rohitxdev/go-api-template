@@ -2,16 +2,14 @@ package handler
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/rohitxdev/go-api-template/pkg/repo"
+	"github.com/rohitxdev/go-api-template/pkg/util"
 	"golang.org/x/crypto/bcrypt"
-
-	"github.com/rohitxdev/go-api-template/repo"
-	"github.com/rohitxdev/go-api-template/util"
 )
 
 var (
@@ -113,29 +111,6 @@ func (h *Handler) SendPasswordChangeEmail(c echo.Context) error {
 
 type ForgotPasswordRequest struct {
 	Email string `json:"email" validate:"required,email"`
-}
-
-func (h *Handler) ForgotPassword(c echo.Context) error {
-	req := new(ForgotPasswordRequest)
-	if err := util.BindAndValidate(c, req); err != nil {
-		return err
-	}
-	user, err := h.repo.GetUserByEmail(c.Request().Context(), util.SanitizeEmail(req.Email))
-	if err != nil {
-		if errors.Is(err, repo.ErrUserNotFound) {
-			return c.String(http.StatusNotFound, repo.ErrUserNotFound.Error())
-		}
-		return c.String(http.StatusInternalServerError, echo.ErrInternalServerError.Error())
-	}
-	token, _ := util.GenerateJWT(user.Id, time.Minute*10, h.config.JWT_SECRET)
-	u, _ := url.Parse(fmt.Sprintf("https://%s:%s/v1/auth/reset-password", h.config.HOST, h.config.PORT))
-	q := u.Query()
-	q.Set("token", token)
-	u.RawQuery = q.Encode()
-	go func() {
-		_ = h.email.SendPasswordResetLink(u.String(), user.Email)
-	}()
-	return c.String(http.StatusOK, "sent password reset link to email")
 }
 
 type ResetPasswordRequest struct {
