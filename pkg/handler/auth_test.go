@@ -17,19 +17,19 @@ import (
 )
 
 func TestAuth(t *testing.T) {
-	c, err := config.Load("../.env")
+	cfg, err := config.Load("../.env")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	db, err := sql.Open("postgres", c.DB_URL)
+	db, err := sql.Open("postgres", cfg.DB_URL)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
 
 	r := repo.New(db)
-	h := handler.New(c, r, nil)
+	h := handler.New(cfg, r, nil)
 	e, err := handler.NewRouter(h)
 	if err != nil {
 		t.Fatal(err)

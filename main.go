@@ -6,64 +6,113 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
-	"sync"
 	"time"
 
 	"github.com/rohitxdev/go-api-template/pkg/config"
 	"github.com/rohitxdev/go-api-template/pkg/handler"
+	"github.com/rohitxdev/go-api-template/pkg/logger"
 	"github.com/rohitxdev/go-api-template/pkg/repo"
 )
+
+// Build info
+var BuildInfo string
 
 //go:embed templates public
 var staticFS embed.FS
 
 func main() {
-	c, err := config.Load(".env")
+	defer fmt.Println()
+
+	//Load config
+	cfg, err := config.Load(".env")
 	if err != nil {
-		panic("could not load config: " + err.Error())
+		panic("load config: " + err.Error())
 	}
 
-	db, err := sql.Open("postgres", c.DB_URL)
-	if err != nil {
-		panic("could not connect to PostgreSQL database: " + err.Error())
+	//Set up logger
+	loggerOpts := logger.HandlerOpts{
+		TimeFormat: time.RFC3339,
+		Level:      slog.LevelDebug,
+		NoColor:    !cfg.IS_DEV,
 	}
-	defer db.Close()
 
+	if cfg.IS_DEV {
+		loggerOpts.TimeFormat = time.Kitchen
+	}
+
+	slog.SetDefault(slog.New(logger.NewHandler(os.Stderr, loggerOpts)))
+
+	slog.Debug("running " + BuildInfo + " in " + cfg.APP_ENV + " environment")
+
+	//Connect to database
+	slog.Debug("connecting to database... ⏳")
+
+	db, err := sql.Open("postgres", cfg.DB_URL)
+	if err != nil {
+		panic("connect to database: " + err.Error())
+	}
+	defer func() {
+		if err = db.Close(); err != nil {
+			panic("close database: " + err.Error())
+		}
+		slog.Debug("database connection closed ✔︎")
+	}()
+
+	slog.Debug("connected to database ✔︎")
+
+	//Create handler
 	r := repo.New(db)
-	h := handler.New(c, r, &staticFS)
+	h := handler.New(cfg, r, &staticFS)
 
 	e, err := handler.NewRouter(h)
 	if err != nil {
-		panic("could not create router: " + err.Error())
+		panic("create router: " + err.Error())
 	}
+
+	//Create tcp listener
+	slog.Debug("creating tcp listener... ⏳")
+
+	ls, err := net.Listen("tcp", cfg.HOST+":"+cfg.PORT)
+	if err != nil {
+		panic("tcp listen: " + err.Error())
+	}
+	defer func() {
+		if err = ls.Close(); err != nil {
+			panic("close tcp listener: " + err.Error())
+		}
+		slog.Debug("tcp listener closed ✔︎")
+	}()
+	slog.Debug("tcp listener created ✔︎")
+
+	slog.Debug("http server started ✔︎")
+	slog.Info("server is listening to \033[32mhttp://" + ls.Addr().String() + "\033[0m")
+
+	go func() {
+		if err := http.Serve(ls, e); err != nil && !errors.Is(err, net.ErrClosed) {
+			panic("serve http: " + err.Error())
+		}
+	}()
+
+	//Graceful shutdown
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	go func() {
-		defer wg.Done()
-		if err := e.Start(fmt.Sprintf("%s:%s", c.HOST, c.PORT)); !errors.Is(err, http.ErrServerClosed) && err != nil {
-			panic("could not start HTTP server: " + err.Error())
-		}
-	}()
-
 	<-ctx.Done()
 
-	fmt.Println("\nShutting down server...")
+	slog.Debug("shutting down http server... ⏳")
 
-	ctx, cancel = context.WithTimeout(context.Background(), time.Second*10)
+	ctx, cancel = context.WithTimeout(context.Background(), cfg.SHUTDOWN_TIMEOUT)
 	defer cancel()
 
 	if err := e.Shutdown(ctx); err != nil {
-		panic("could not shutdown server gracefully: " + err.Error())
+		panic("http server shutdown: " + err.Error())
 	}
 
-	wg.Wait()
-	fmt.Println("Server shutdown gracefully")
+	slog.Debug("server shut down gracefully ✔︎")
 }

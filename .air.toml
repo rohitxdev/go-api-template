@@ -1,28 +1,28 @@
-# Config file for [Air](https://github.com/cosmtrek/air) in TOML format
+# Config file for [Air](https://github.com/air-verse/air) in TOML format
 
 # Working directory
 # . or absolute path, please note that the directories following must be under root.
 root = "."
-tmp_dir = "bin"
+tmp_dir = "tmp"
 
 [build]
 # Array of commands to run before each build
 pre_cmd = []
 
 # Just plain old shell command. You could use `make` as well.
-cmd = "./tasks.sh build"
+cmd = ""
 
 # Array of commands to run after ^C
 post_cmd = []
 
 # Binary file yields from `cmd`.
-bin = "bin/build_debug"
+bin = ""
 
 # Customize binary, can setup environment variables when run your app.
-full_bin = ""
+full_bin = "$SHELL ./tasks.sh run"
 
 # Watch these filename extensions.
-include_ext = ["go", "tpl", "tmpl", "templ", "html", ".env"]
+include_ext = ["go", "tpl", "tmpl", "templ", "html", "env"]
 
 # Ignore these filename extensions or directories.
 exclude_dir = ["assets", "vendor", "testdata","cache"]
@@ -96,3 +96,9 @@ clean_on_exit = true
 [screen]
 clear_on_rebuild = false
 keep_scroll = true
+
+# Enable live-reloading on the browser.
+[proxy]
+enabled = false
+proxy_port = 8090
+app_port = 8080

@@ -13,13 +13,13 @@ FROM --platform=$BUILDPLATFORM golang:$GO_VERSION AS dev
 
 WORKDIR /app
 
-RUN go install github.com/cosmtrek/air@latest
+RUN go install github.com/air-verse/air@latest
 
 COPY go.mod go.sum ./
 
 RUN go mod download
 
-CMD ["./tasks.sh", "watch"]
+CMD ["./tasks.sh","watch"]
 
 
 # Multi-stage Build Image
@@ -41,7 +41,7 @@ RUN GOARCH=$TARGETARCH GOOS=$TARGETOS ./tasks.sh build --release
 # Production Image
 FROM --platform=$BUILDPLATFORM $IMAGE_OS:$IMAGE_OS_VERSION AS prod
 
-COPY --from=build /app/bin/build_release /app/build_release
+COPY --from=build /app/bin/release_build /app/release_build
 
 # Create a non-privileged user that the app will run under.
 # See https://docs.docker.com/go/dockerfile-user-best-practices/
@@ -58,6 +58,6 @@ RUN adduser \
 
 USER non_root_user
 
-EXPOSE 8443
+EXPOSE 8000
 
-CMD ["/app/build_release" ]
+CMD ["/app/release_build" ]

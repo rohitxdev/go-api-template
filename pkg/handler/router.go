@@ -16,38 +16,13 @@ import (
 	"github.com/labstack/echo-contrib/pprof"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/lmittmann/tint"
+	"github.com/rohitxdev/go-api-template/pkg/id"
+	"github.com/rohitxdev/go-api-template/pkg/logger"
 	"github.com/rohitxdev/go-api-template/pkg/repo"
-	"github.com/rohitxdev/go-api-template/pkg/util"
-	"github.com/rs/xid"
 	"golang.org/x/time/rate"
 
 	"github.com/goccy/go-json"
 )
-
-func (h *Handler) RegisterRoutes(e *echo.Echo) {
-	v1 := e.Group("/v1")
-
-	// {
-	// 	auth.POST("/log-in", LogIn)
-	// 	auth.POST("/log-out", LogOut)
-	// 	auth.POST("/sign-up", SignUp)
-	// 	auth.POST("/forgot-password", ForgotPassword)
-	// 	auth.GET("/reset-password", ResetPassword)
-	// 	auth.POST("/reset-password", ResetPassword)
-	// 	auth.GET("/access-token", GetAccessToken)
-	// 	auth.DELETE("/delete-account", DeleteAccount, Auth(RoleUser))
-	// 	auth.GET("/oauth2/:provider", OAuth2LogIn)
-	// 	auth.GET("/oauth2/callback/:provider", OAuth2Callback)
-	// }
-
-	files := v1.Group("/files")
-	{
-		files.GET("/:file_name", h.GetFile)
-		files.GET("", h.GetFileList)
-		files.POST("", h.PutFile)
-	}
-}
 
 // Custom view renderer
 
@@ -97,9 +72,8 @@ func (s echoJSONSerializer) Deserialize(c echo.Context, i interface{}) error {
 func NewRouter(h *Handler) (*echo.Echo, error) {
 	e := echo.New()
 
-	if !h.config.IS_DEV {
-		e.HideBanner = true
-	}
+	e.HideBanner = true
+	e.HidePort = true
 
 	e.JSONSerializer = echoJSONSerializer{}
 
@@ -134,27 +108,37 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 
 	e.Pre(middleware.RequestIDWithConfig(middleware.RequestIDConfig{
 		Generator: func() string {
-			return xid.New().String()
+			return id.New(id.Request)
 		},
 	}))
 
-	// Logger
+	// HTTP Logger
 
-	logOpts := tint.Options{
-		TimeFormat: util.Tern(h.config.IS_DEV, time.Kitchen, time.RFC3339),
-		Level:      slog.LevelDebug,
-		AddSource:  true,
+	reqLoggerOpts := logger.HandlerOpts{
+		TimeFormat: time.RFC3339,
+		Level:      slog.LevelInfo,
 		NoColor:    !h.config.IS_DEV,
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			if a.Value.String() == "" || a.Value.Equal(slog.AnyValue(nil)) {
+			switch {
+			case a.Key == "user_id" && a.Value.Int64() == 0:
+				fallthrough
+			case a.Value.String() == "":
+				fallthrough
+			case a.Value.Equal(slog.AnyValue(nil)):
 				return slog.Attr{}
 			}
 			return a
 		},
 	}
-	logger := slog.New(tint.NewHandler(os.Stderr, &logOpts))
+
+	if h.config.IS_DEV {
+		reqLoggerOpts.TimeFormat = time.Kitchen
+	}
+
+	logger := slog.New(logger.NewHandler(os.Stderr, reqLoggerOpts))
 
 	e.Pre(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
+		LogRequestID:    true,
 		LogHost:         true,
 		LogRemoteIP:     true,
 		LogProtocol:     true,
@@ -163,9 +147,8 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 		LogStatus:       true,
 		LogLatency:      true,
 		LogResponseSize: true,
-		LogUserAgent:    true,
 		LogReferer:      true,
-		LogRequestID:    true,
+		LogUserAgent:    true,
 		LogError:        true,
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
 			var userId uint
@@ -178,6 +161,7 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 				c.Request().Context(),
 				slog.LevelInfo,
 				"request",
+				slog.String("id", v.RequestID),
 				slog.String("host", v.Host),
 				slog.String("req_ip", v.RemoteIP),
 				slog.String("protocol", v.Protocol),
@@ -186,9 +170,8 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 				slog.Int("status", v.Status),
 				slog.Duration("latency_ms", v.Latency.Round(time.Millisecond)),
 				slog.Int64("res_bytes", v.ResponseSize),
-				slog.String("user_agent", v.UserAgent),
 				slog.String("referer", v.Referer),
-				slog.String("id", v.RequestID),
+				slog.String("user_agent", v.UserAgent),
 				slog.Int("user_id", int(userId)),
 				slog.Any("error", v.Error),
 			)
@@ -233,7 +216,10 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 		return c.String(http.StatusOK, "pong")
 	})
 
-	h.RegisterRoutes(e)
+	v1 := e.Group("/v1")
+	{
+		v1.GET("/config", h.GetConfig)
+	}
 
 	return e, nil
 }

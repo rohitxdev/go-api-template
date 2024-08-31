@@ -8,59 +8,9 @@ services:
     volumes:
       - .:/app
     ports:
-      - 8443:8443
-    depends_on:
-      - mongodb
-      - minio
+      - 8000:8000
     env_file:
       - ${ENV_FILE}
-    environment:
-      APP_ENV: development
-    deploy:
-      resources:
-        limits:
-          memory: 1024M
-    
-  mongodb:
-    image: mongo
-    ports:
-      - 27017:27017
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: rootuser
-      MONGO_INITDB_ROOT_PASSWORD: rootuser
-    restart: unless-stopped
-    volumes:
-      - mongodb-volume-dev:/data/db
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-  
-  minio:
-    image: minio/minio
-    ports:
-      - 9000:9000
-      - 9001:9001
-    environment:
-      MINIO_ROOT_USER: rootuser
-      MINIO_ROOT_PASSWORD: rootuser
-      MINIO_CONSOLE_ADDRESS: :9001
-    restart: unless-stopped
-    volumes:
-      - minio-volume-dev:/data
-    command: server /data
-
-  nats-queue:
-    image: nats
-    ports:
-      - 4222:4222
-      - 8222:8222
-
-
-volumes:
-  mongodb-volume-dev:
-  minio-volume-dev:
-
 
 
     

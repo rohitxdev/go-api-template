@@ -12,12 +12,12 @@ import (
 )
 
 func TestStorageService(t *testing.T) {
-	c, err := config.Load("../.env")
+	cfg, err := config.Load("../.env")
 	if err != nil {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	fs, err := service.NewFileStorage(c.S3_ENDPOINT, c.S3_DEFAULT_REGION, c.AWS_ACCESS_KEY_ID, c.AWS_ACCESS_KEY_SECRET)
+	fs, err := service.NewFileStorage(cfg.S3_ENDPOINT, cfg.S3_DEFAULT_REGION, cfg.AWS_ACCESS_KEY_ID, cfg.AWS_ACCESS_KEY_SECRET)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,14 +37,14 @@ func TestStorageService(t *testing.T) {
 	}
 
 	t.Run("Upload file to bucket", func(t *testing.T) {
-		err := fs.Upload(ctx, c.S3_ENDPOINT, testFile.Name(), testFileContent)
+		err := fs.Upload(ctx, cfg.S3_ENDPOINT, testFile.Name(), testFileContent)
 		if err != nil {
 			t.Error(err)
 		}
 	})
 
 	t.Run("Get file from bucket", func(t *testing.T) {
-		fileContent, err := fs.Get(ctx, c.S3_ENDPOINT, testFile.Name())
+		fileContent, err := fs.Get(ctx, cfg.S3_ENDPOINT, testFile.Name())
 		if err != nil {
 			t.Error(err)
 		}
@@ -54,11 +54,11 @@ func TestStorageService(t *testing.T) {
 	})
 
 	t.Run("Delete file from bucket", func(t *testing.T) {
-		err := fs.Delete(ctx, c.S3_ENDPOINT, testFile.Name())
+		err := fs.Delete(ctx, cfg.S3_ENDPOINT, testFile.Name())
 		if err != nil {
 			t.Error(err)
 		}
-		_, err = fs.Get(ctx, c.S3_ENDPOINT, testFile.Name())
+		_, err = fs.Get(ctx, cfg.S3_ENDPOINT, testFile.Name())
 		if err == nil {
 			t.Error(err)
 		}

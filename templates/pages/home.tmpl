@@ -2,13 +2,15 @@
 <html>
 
 <style>
+    :root{
+        color-scheme: dark light;
+    }
+    
     body{
         display: grid;
         place-content: center;
         place-items: center;
         font-family: monospace;
-        background-color: #333333;
-        color: #ffffff;
     }
 
     ul{
@@ -37,15 +39,16 @@
 \____/\____/    /_/    /_____/\___/_/ /_/\____/  /_/  |_/_/   /___/      
                                                                          
     </pre>
-        <ul>
-            {{range $k,$v := .}}
-            <li>
-                <span scope="row">{{$k}}</span>
-                <span>-</span>
-                <span>{{$v}}</span>
-            </li>
-            {{end}}
-        </ul>
+    <img src="images/go-fast.png" alt="Gopher running fast" height="200" width="200"/>
+    <ul>
+        {{range $k,$v := .}}
+        <li>
+            <span scope="row">{{$k}}</span>
+            <span>-</span>
+            <span>{{$v}}</span>
+        </li>
+        {{end}}
+    </ul>
 </body>
 
 </html>

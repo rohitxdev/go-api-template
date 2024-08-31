@@ -23,8 +23,6 @@ type Config struct {
 	HOST                     string `validate:"required,ip"`
 	PORT                     string `validate:"required,gte=0"`
 	JWT_SECRET               string `validate:"required"`
-	TLS_CERT_PATH            string `validate:"required,filepath"`
-	TLS_KEY_PATH             string `validate:"required,filepath"`
 	APP_ENV                  string `validate:"required,oneof=development production"`
 	DB_URL                   string `validate:"required"`
 	MONGODB_URL              string `validate:"required"`
@@ -45,9 +43,10 @@ type Config struct {
 	GITHUB_CLIENT_ID         string
 	GITHUB_CLIENT_SECRET     string
 	STRIPE_API_KEY           string
-	AMQP_URL                 string
+	NATS_URL                 string
 	ACCESS_TOKEN_EXPIRES_IN  time.Duration `validate:"required"`
 	REFRESH_TOKEN_EXPIRES_IN time.Duration `validate:"required"`
+	SHUTDOWN_TIMEOUT         time.Duration `validate:"required"`
 	RATE_LIMIT_PER_MINUTE    int           `validate:"required"`
 	SMTP_PORT                int           `validate:"required"`
 	IS_DEV                   bool
@@ -77,22 +76,27 @@ func Load(envFilePath string) (*Config, error) {
 
 	accessTokenExpiresIn, err := time.ParseDuration(os.Getenv("ACCESS_TOKEN_EXPIRES_IN"))
 	if err != nil {
-		return nil, errors.Join(errors.New("could not parse access token expiration duration"), err)
+		return nil, errors.Join(errors.New("parse access token expiration duration"), err)
 	}
 
 	refreshTokenExpiresIn, err := time.ParseDuration(os.Getenv("REFRESH_TOKEN_EXPIRES_IN"))
 	if err != nil {
-		return nil, errors.Join(errors.New("could not parse refresh token expiration duration"), err)
+		return nil, errors.Join(errors.New("parse refresh token expiration duration"), err)
 	}
 
 	smtpPort, err := strconv.ParseInt(os.Getenv("SMTP_PORT"), 10, 16)
 	if err != nil {
-		return nil, errors.Join(errors.New("could not parse SMTP port"), err)
+		return nil, errors.Join(errors.New("parse SMTP port"), err)
+	}
+
+	shutdownTimeout, err := time.ParseDuration(os.Getenv("SHUTDOWN_TIMEOUT"))
+	if err != nil {
+		return nil, errors.Join(errors.New("parse shutdown timeout"), err)
 	}
 
 	rateLimitPerMinute, err := strconv.ParseInt(os.Getenv("RATE_LIMIT_PER_MINUTE"), 10, 8)
 	if err != nil {
-		return nil, errors.Join(errors.New("could not parse rate limit"), err)
+		return nil, errors.Join(errors.New("parse rate limit"), err)
 	}
 
 	c := Config{
@@ -100,8 +104,6 @@ func Load(envFilePath string) (*Config, error) {
 		HOST:                     os.Getenv("HOST"),
 		PORT:                     os.Getenv("PORT"),
 		JWT_SECRET:               os.Getenv("JWT_SECRET"),
-		TLS_CERT_PATH:            os.Getenv("TLS_CERT_PATH"),
-		TLS_KEY_PATH:             os.Getenv("TLS_KEY_PATH"),
 		DB_URL:                   os.Getenv("DB_URL"),
 		MONGODB_URL:              os.Getenv("MONGODB_URL"),
 		REDIS_HOST:               os.Getenv("REDIS_HOST"),
@@ -121,16 +123,18 @@ func Load(envFilePath string) (*Config, error) {
 		GITHUB_CLIENT_ID:         os.Getenv("GITHUB_CLIENT_ID"),
 		GITHUB_CLIENT_SECRET:     os.Getenv("GITHUB_CLIENT_SECRET"),
 		STRIPE_API_KEY:           os.Getenv("STRIPE_API_KEY"),
-		AMQP_URL:                 os.Getenv("AMQP_URL"),
+		NATS_URL:                 os.Getenv("NATS_URL"),
 		ACCESS_TOKEN_EXPIRES_IN:  accessTokenExpiresIn,
 		REFRESH_TOKEN_EXPIRES_IN: refreshTokenExpiresIn,
+		SHUTDOWN_TIMEOUT:         shutdownTimeout,
 		RATE_LIMIT_PER_MINUTE:    int(rateLimitPerMinute),
-		SMTP_PORT:                int(smtpPort),
-		IS_DEV:                   os.Getenv("APP_ENV") != "production",
+
+		SMTP_PORT: int(smtpPort),
+		IS_DEV:    os.Getenv("APP_ENV") != "production",
 	}
 
 	if err := validator.New().Struct(c); err != nil {
-		return nil, errors.Join(errors.New("could not validate config"), err)
+		return nil, errors.Join(errors.New("validate config"), err)
 	}
 
 	if c.GOOGLE_CLIENT_ID != "" && c.GOOGLE_CLIENT_SECRET != "" {
