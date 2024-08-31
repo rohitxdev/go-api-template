@@ -11,11 +11,10 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"time"
 
 	"github.com/rohitxdev/go-api-template/pkg/config"
 	"github.com/rohitxdev/go-api-template/pkg/handler"
-	"github.com/rohitxdev/go-api-template/pkg/logger"
+	"github.com/rohitxdev/go-api-template/pkg/prettylog"
 	"github.com/rohitxdev/go-api-template/pkg/repo"
 )
 
@@ -26,7 +25,7 @@ var BuildInfo string
 var staticFS embed.FS
 
 func main() {
-	defer fmt.Println()
+	fmt.Println()
 
 	//Load config
 	cfg, err := config.Load(".env")
@@ -34,24 +33,20 @@ func main() {
 		panic("load config: " + err.Error())
 	}
 
-	//Set up logger
-	loggerOpts := logger.HandlerOpts{
-		TimeFormat: time.RFC3339,
-		Level:      slog.LevelDebug,
-		NoColor:    !cfg.IS_DEV,
+	logOpts := slog.HandlerOptions{
+		Level: slog.LevelDebug,
 	}
 
+	var logHandler slog.Handler = slog.NewJSONHandler(os.Stderr, &logOpts)
 	if cfg.IS_DEV {
-		loggerOpts.TimeFormat = time.Kitchen
+		logHandler = prettylog.NewHandler(os.Stderr, &logOpts)
 	}
 
-	slog.SetDefault(slog.New(logger.NewHandler(os.Stderr, loggerOpts)))
+	slog.SetDefault(slog.New(logHandler))
 
 	slog.Debug("running " + BuildInfo + " in " + cfg.APP_ENV + " environment")
 
 	//Connect to database
-	slog.Debug("connecting to database... ⏳")
-
 	db, err := sql.Open("postgres", cfg.DB_URL)
 	if err != nil {
 		panic("connect to database: " + err.Error())
@@ -75,8 +70,6 @@ func main() {
 	}
 
 	//Create tcp listener
-	slog.Debug("creating tcp listener... ⏳")
-
 	ls, err := net.Listen("tcp", cfg.HOST+":"+cfg.PORT)
 	if err != nil {
 		panic("tcp listen: " + err.Error())
@@ -90,7 +83,7 @@ func main() {
 	slog.Debug("tcp listener created ✔︎")
 
 	slog.Debug("http server started ✔︎")
-	slog.Info("server is listening to \033[32mhttp://" + ls.Addr().String() + "\033[0m")
+	slog.Info("server is listening to http://" + ls.Addr().String())
 
 	go func() {
 		if err := http.Serve(ls, e); err != nil && !errors.Is(err, net.ErrClosed) {
@@ -98,14 +91,12 @@ func main() {
 		}
 	}()
 
-	//Graceful shutdown
+	//Shut down http server gracefully
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
 	<-ctx.Done()
-
-	slog.Debug("shutting down http server... ⏳")
 
 	ctx, cancel = context.WithTimeout(context.Background(), cfg.SHUTDOWN_TIMEOUT)
 	defer cancel()
@@ -114,5 +105,5 @@ func main() {
 		panic("http server shutdown: " + err.Error())
 	}
 
-	slog.Debug("server shut down gracefully ✔︎")
+	slog.Debug("shut down http server gracefully ✔︎")
 }

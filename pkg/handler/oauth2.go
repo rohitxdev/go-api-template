@@ -103,7 +103,7 @@ func (h *Handler) OAuth2Callback(c echo.Context) error {
 	// }
 	// return  err
 	// }
-	accessToken, refreshToken := util.GenerateAccessAndRefreshTokens(uint(user.Id), h.config.ACCESS_TOKEN_EXPIRES_IN, h.config.REFRESH_TOKEN_EXPIRES_IN, h.config.JWT_SECRET)
+	accessToken, refreshToken := util.GenerateAccessAndRefreshTokens(user.Id, h.config.ACCESS_TOKEN_EXPIRES_IN, h.config.REFRESH_TOKEN_EXPIRES_IN, h.config.JWT_SECRET)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}

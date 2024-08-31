@@ -21,12 +21,7 @@ require (
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 )
 
-require (
-	github.com/google/go-cmp v0.6.0 // indirect
-	github.com/rs/xid v1.6.0
-)
-
-require github.com/lmittmann/tint v1.0.5
+require github.com/google/go-cmp v0.6.0 // indirect
 
 require (
 	cloud.google.com/go/compute/metadata v0.5.0 // indirect
@@ -55,7 +50,7 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	golang.org/x/net v0.27.0 // indirect
-	golang.org/x/sys v0.22.0 // indirect
+	golang.org/x/sys v0.24.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect

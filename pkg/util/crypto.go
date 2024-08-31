@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt"
@@ -58,7 +57,7 @@ func DecryptAES(encryptedData []byte, key []byte) ([]byte, error) {
 	return data, nil
 }
 
-func GenerateJWT(userId uint, expiresIn time.Duration, secret string) (string, error) {
+func GenerateJWT(userId string, expiresIn time.Duration, secret string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, jwt.StandardClaims{Id: fmt.Sprintf("%v", userId), ExpiresAt: time.Now().Add(expiresIn).Unix()})
 	tokenString, err := token.SignedString([]byte(secret))
 	if err != nil {
@@ -67,7 +66,7 @@ func GenerateJWT(userId uint, expiresIn time.Duration, secret string) (string, e
 	return tokenString, nil
 }
 
-func VerifyJWT(token string, secret string) (uint, error) {
+func VerifyJWT(token string, secret string) (string, error) {
 	claims := new(jwt.StandardClaims)
 	_, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (interface{}, error) {
 		return []byte(secret), nil
@@ -76,18 +75,18 @@ func VerifyJWT(token string, secret string) (uint, error) {
 		if err, ok := err.(*jwt.ValidationError); ok {
 			switch err.Errors {
 			case jwt.ValidationErrorExpired:
-				return 0, ErrTokenExpired
+				return "", ErrTokenExpired
 			case jwt.ValidationErrorMalformed:
-				return 0, ErrMalformedToken
+				return "", ErrMalformedToken
 			}
 		}
-		return 0, err
+		return "", err
 	}
-	userId, _ := strconv.Atoi(claims.Id)
-	return uint(userId), nil
+
+	return claims.Id, nil
 }
 
-func GenerateAccessAndRefreshTokens(userId uint, accessTokenExpiry time.Duration, refreshTokenExpiry time.Duration, secret string) (string, string) {
+func GenerateAccessAndRefreshTokens(userId string, accessTokenExpiry time.Duration, refreshTokenExpiry time.Duration, secret string) (string, string) {
 	accessToken, _ := GenerateJWT(userId, accessTokenExpiry, secret)
 	refreshToken, _ := GenerateJWT(userId, refreshTokenExpiry, secret)
 	return accessToken, refreshToken

@@ -17,7 +17,6 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/rohitxdev/go-api-template/pkg/id"
-	"github.com/rohitxdev/go-api-template/pkg/logger"
 	"github.com/rohitxdev/go-api-template/pkg/repo"
 	"golang.org/x/time/rate"
 
@@ -85,6 +84,12 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 		validator: validator.New(),
 	}
 
+	e.IPExtractor = echo.ExtractIPFromXFFHeader(
+		echo.TrustLoopback(false),   // e.g. ipv4 start with 127.
+		echo.TrustLinkLocal(false),  // e.g. ipv4 start with 169.254
+		echo.TrustPrivateNet(false), // e.g. ipv4 start with 10. or 192.168
+	)
+
 	e.Pre(middleware.StaticWithConfig(middleware.StaticConfig{
 		Root:       "public",
 		Filesystem: http.FS(h.staticFS),
@@ -112,67 +117,47 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 		},
 	}))
 
-	// HTTP Logger
-
-	reqLoggerOpts := logger.HandlerOpts{
-		TimeFormat: time.RFC3339,
-		Level:      slog.LevelInfo,
-		NoColor:    !h.config.IS_DEV,
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			switch {
-			case a.Key == "user_id" && a.Value.Int64() == 0:
-				fallthrough
-			case a.Value.String() == "":
-				fallthrough
-			case a.Value.Equal(slog.AnyValue(nil)):
-				return slog.Attr{}
-			}
-			return a
-		},
-	}
-
-	if h.config.IS_DEV {
-		reqLoggerOpts.TimeFormat = time.Kitchen
-	}
-
-	logger := slog.New(logger.NewHandler(os.Stderr, reqLoggerOpts))
-
 	e.Pre(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
-		LogRequestID:    true,
-		LogHost:         true,
-		LogRemoteIP:     true,
-		LogProtocol:     true,
-		LogURI:          true,
-		LogMethod:       true,
-		LogStatus:       true,
-		LogLatency:      true,
-		LogResponseSize: true,
-		LogReferer:      true,
-		LogUserAgent:    true,
-		LogError:        true,
+		LogRequestID:     true,
+		LogHost:          true,
+		LogRemoteIP:      true,
+		LogProtocol:      true,
+		LogURI:           true,
+		LogMethod:        true,
+		LogStatus:        true,
+		LogLatency:       true,
+		LogResponseSize:  true,
+		LogReferer:       true,
+		LogUserAgent:     true,
+		LogError:         true,
+		LogContentLength: true,
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
-			var userId uint
+			var userId string
 			user, ok := c.Get("user").(*repo.User)
 			if ok && (user != nil) {
 				userId = user.Id
 			}
 
-			logger.LogAttrs(
+			slog.InfoContext(
 				c.Request().Context(),
-				slog.LevelInfo,
-				"request",
-				slog.String("id", v.RequestID),
-				slog.String("host", v.Host),
-				slog.String("req_ip", v.RemoteIP),
-				slog.String("protocol", v.Protocol),
-				slog.String("uri", v.URI),
-				slog.String("method", v.Method),
-				slog.Int("status", v.Status),
-				slog.Duration("latency_ms", v.Latency.Round(time.Millisecond)),
-				slog.Int64("res_bytes", v.ResponseSize),
-				slog.String("referer", v.Referer),
-				slog.String("user_agent", v.UserAgent),
-				slog.Int("user_id", int(userId)),
+				"http request",
+				slog.Group("request",
+					slog.String("id", v.RequestID),
+					slog.String("host", v.Host),
+					slog.String("clientIp", v.RemoteIP),
+					slog.String("protocol", v.Protocol),
+					slog.String("uri", v.URI),
+					slog.String("method", v.Method),
+					slog.String("referer", v.Referer),
+					slog.String("userAgent", v.UserAgent),
+					slog.Duration("durationMs", v.Latency.Round(time.Millisecond)),
+				),
+				slog.Group("response",
+					slog.Int("status", v.Status),
+					slog.Int64("sizeBytes", v.ResponseSize),
+				),
+				slog.String("userId", userId),
+				slog.Any("cookies", c.Cookies()),
 				slog.Any("error", v.Error),
 			)
 

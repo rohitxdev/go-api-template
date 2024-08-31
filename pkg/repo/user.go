@@ -33,10 +33,10 @@ type User struct {
 	ImageUrl      string `json:"image_url"`
 	CreatedAt     string `json:"created_at"`
 	UpdatedAt     string `json:"updated_at"`
-	Id            uint   `json:"id"`
+	Id            string `json:"id"`
 }
 
-func (repo *Repo) GetUserById(ctx context.Context, userId uint) (*User, error) {
+func (repo *Repo) GetUserById(ctx context.Context, userId string) (*User, error) {
 	user := new(User)
 	err := repo.db.QueryRowContext(ctx, `SELECT id, role, email, password_hash, COALESCE(username, ''), COALESCE(full_name, ''), COALESCE(date_of_birth, '-infinity'), COALESCE(gender, ''), COALESCE(phone_number, ''), COALESCE(account_status, ''), COALESCE(image_url, ''), created_at, updated_at FROM users WHERE id=$1 LIMIT 1;`, userId).Scan(&user.Id, &user.Role, &user.Email, &user.PasswordHash, &user.Username, &user.FullName, &user.DateOfBirth, &user.Gender, &user.PhoneNumber, &user.AccountStatus, &user.ImageUrl, &user.CreatedAt, &user.UpdatedAt)
 
@@ -78,29 +78,29 @@ func (repo *Repo) GetUserByEmail(ctx context.Context, email string) (*User, erro
 	return user, nil
 }
 
-func (repo *Repo) CreateUser(ctx context.Context, user *UserCore) (uint, error) {
-	var id uint
+func (repo *Repo) CreateUser(ctx context.Context, user *UserCore) (string, error) {
+	var id string
 	err := repo.db.QueryRowContext(ctx, `INSERT INTO users(email, password_hash) VALUES($1, $2) RETURNING id;`, user.Email, user.PasswordHash).Scan(&id)
 	if err != nil {
 		if err, ok := err.(*pq.Error); ok {
 			switch code := err.Code.Name(); code {
 			case "unique_violation":
-				return 0, ErrUserAlreadyExists
+				return "", ErrUserAlreadyExists
 			default:
-				return 0, errors.New(code)
+				return "", errors.New(code)
 			}
 		}
-		return 0, err
+		return "", err
 	}
 	return id, err
 }
 
-func (repo *Repo) DeleteUserById(ctx context.Context, id uint) error {
+func (repo *Repo) DeleteUserById(ctx context.Context, id string) error {
 	_, err := repo.db.ExecContext(ctx, `DELETE FROM users WHERE id=$1;`, id)
 	return err
 }
 
-func (repo *Repo) Update(ctx context.Context, id uint, updates map[string]any) error {
+func (repo *Repo) Update(ctx context.Context, id string, updates map[string]any) error {
 	query := "UPDATE users SET "
 	var params []interface{}
 

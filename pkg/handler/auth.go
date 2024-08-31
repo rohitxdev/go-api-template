@@ -60,7 +60,7 @@ func (h *Handler) LogIn(c echo.Context) error {
 	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		return c.String(http.StatusUnauthorized, err.Error())
 	}
-	accessToken, refreshToken := util.GenerateAccessAndRefreshTokens(uint(user.Id), h.config.ACCESS_TOKEN_EXPIRES_IN, h.config.REFRESH_TOKEN_EXPIRES_IN, h.config.JWT_SECRET)
+	accessToken, refreshToken := util.GenerateAccessAndRefreshTokens(user.Id, h.config.ACCESS_TOKEN_EXPIRES_IN, h.config.REFRESH_TOKEN_EXPIRES_IN, h.config.JWT_SECRET)
 	c.SetCookie(util.CreateLogInCookie(refreshToken, h.config.REFRESH_TOKEN_EXPIRES_IN))
 	return c.JSON(http.StatusOK, LogInResponse{AccessToken: accessToken})
 }
@@ -91,7 +91,7 @@ func (h *Handler) SignUp(c echo.Context) error {
 	if err != nil {
 		return c.String(http.StatusBadRequest, err.Error())
 	}
-	accessToken, refreshToken := util.GenerateAccessAndRefreshTokens(uint(userId), h.config.ACCESS_TOKEN_EXPIRES_IN, h.config.REFRESH_TOKEN_EXPIRES_IN, h.config.JWT_SECRET)
+	accessToken, refreshToken := util.GenerateAccessAndRefreshTokens(userId, h.config.ACCESS_TOKEN_EXPIRES_IN, h.config.REFRESH_TOKEN_EXPIRES_IN, h.config.JWT_SECRET)
 	c.SetCookie(util.CreateLogInCookie(refreshToken, h.config.REFRESH_TOKEN_EXPIRES_IN))
 	return c.JSON(http.StatusCreated, SignUpResponse{AccessToken: accessToken})
 }
