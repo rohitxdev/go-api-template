@@ -86,7 +86,7 @@ type logHandler struct {
 
 var _ slog.Handler = (*logHandler)(nil)
 
-// Prints pretty logs in both plain text and JSON formats depending on the number of attributes. Use only for development.
+// Prints pretty logs in both plain text and JSON formats depending on the number of attributes. To be used only for development.
 func NewHandler(w io.Writer, opts *slog.HandlerOptions) *logHandler {
 	buf := new(bytes.Buffer)
 	return &logHandler{
