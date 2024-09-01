@@ -8,12 +8,16 @@ ARG TARGETARCH
 ARG TARGETOS
 
 
-# Development Image
-FROM --platform=$BUILDPLATFORM golang:$GO_VERSION AS dev
+# Development image
+FROM --platform=$BUILDPLATFORM golang:$GO_VERSION AS development
 
 WORKDIR /app
 
-RUN go install github.com/air-verse/air@latest
+RUN curl https://sh.rustup.rs | sh -s -- -y
+
+RUN export PATH="$HOME/.cargo/bin:$PATH" && cargo install watchexec-cli
+
+RUN cp $HOME/.cargo/bin/watchexec /usr/local/bin/
 
 COPY go.mod go.sum ./
 
@@ -22,8 +26,8 @@ RUN go mod download
 CMD ["./tasks.sh","watch"]
 
 
-# Multi-stage Build Image
-FROM --platform=$BUILDPLATFORM golang:$GO_VERSION-$IMAGE_OS$IMAGE_OS_VERSION AS build
+# Production builder image
+FROM --platform=$BUILDPLATFORM golang:$GO_VERSION-$IMAGE_OS$IMAGE_OS_VERSION AS builder
 
 WORKDIR /app
 
@@ -35,13 +39,13 @@ RUN go mod download
 
 COPY . .
 
-RUN GOARCH=$TARGETARCH GOOS=$TARGETOS ./tasks.sh build --release
+RUN GOARCH=$TARGETARCH GOOS=$TARGETOS ./tasks.sh build
 
 
-# Production Image
-FROM --platform=$BUILDPLATFORM $IMAGE_OS:$IMAGE_OS_VERSION AS prod
+# Production image
+FROM --platform=$BUILDPLATFORM $IMAGE_OS:$IMAGE_OS_VERSION AS production
 
-COPY --from=build /app/bin/release_build /app/release_build
+COPY --from=builder /app/bin/release_build /app/release_build
 
 # Create a non-privileged user that the app will run under.
 # See https://docs.docker.com/go/dockerfile-user-best-practices/
@@ -60,4 +64,4 @@ USER non_root_user
 
 EXPOSE 8000
 
-CMD ["/app/release_build" ]
+CMD ["/app/build" ]

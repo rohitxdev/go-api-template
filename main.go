@@ -33,8 +33,15 @@ func main() {
 		panic("load config: " + err.Error())
 	}
 
+	//Set up logger
 	logOpts := slog.HandlerOptions{
 		Level: slog.LevelDebug,
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if a.Value.String() == "" {
+				return slog.Attr{}
+			}
+			return a
+		},
 	}
 
 	var logHandler slog.Handler = slog.NewJSONHandler(os.Stderr, &logOpts)
@@ -44,7 +51,7 @@ func main() {
 
 	slog.SetDefault(slog.New(logHandler))
 
-	slog.Debug("running " + BuildInfo + " in " + cfg.APP_ENV + " environment")
+	slog.Debug(BuildInfo + " is running in " + cfg.APP_ENV + " environment")
 
 	//Connect to database
 	db, err := sql.Open("postgres", cfg.DB_URL)
@@ -83,7 +90,7 @@ func main() {
 	slog.Debug("tcp listener created ✔︎")
 
 	slog.Debug("http server started ✔︎")
-	slog.Info("server is listening to http://" + ls.Addr().String())
+	slog.Info("server is listening to \x1b[32mhttp://" + ls.Addr().String() + "\x1b[0m")
 
 	go func() {
 		if err := http.Serve(ls, e); err != nil && !errors.Is(err, net.ErrClosed) {
@@ -92,11 +99,11 @@ func main() {
 	}()
 
 	//Shut down http server gracefully
-
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
 	<-ctx.Done()
+	fmt.Println()
 
 	ctx, cancel = context.WithTimeout(context.Background(), cfg.SHUTDOWN_TIMEOUT)
 	defer cancel()

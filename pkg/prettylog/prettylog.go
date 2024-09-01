@@ -55,25 +55,25 @@ const (
 	ansiBgBrightMagenta = "\x1b[105m"
 	ansiBgBrightCyan    = "\x1b[106m"
 	ansiBgBrightWhite   = "\x1b[107m"
-	ansiGray            = "\x1b[38;5;240m"
+	ansiGrey            = "\x1b[38;5;240m"
 )
 
-func colorize(ansiCode string, v string) string {
-	return ansiCode + v + ansiReset
+func colorize(ansiCode string, text string) string {
+	return ansiCode + text + ansiReset
 }
 
 func getLevelColor(level slog.Level) string {
 	switch level {
 	case slog.LevelDebug:
-		return ansiBrightMagenta
+		return ansiGrey
 	case slog.LevelInfo:
-		return ansiBrightBlue
+		return ansiBrightCyan
 	case slog.LevelWarn:
 		return ansiBrightYellow
 	case slog.LevelError:
 		return ansiBrightRed
 	default:
-		return ansiWhite
+		return ansiBrightWhite
 	}
 }
 
@@ -123,7 +123,7 @@ func (h *logHandler) Handle(ctx context.Context, r slog.Record) error {
 		return err
 	}
 
-	timeStr := colorize(ansiGray, r.Time.Format("[15:04:05]"))
+	timeStr := colorize(ansiGrey, r.Time.Format("[15:04:05]"))
 	levelStr := colorize(getLevelColor(r.Level), r.Level.String())
 	msgStr := colorize(ansiWhite, r.Message)
 
@@ -140,7 +140,7 @@ func (h *logHandler) Handle(ctx context.Context, r slog.Record) error {
 		if err != nil {
 			return errors.Join(errors.New("handler marshal"), err)
 		}
-		logStr += fmt.Sprintf(" %s\n", colorize(ansiGray, string(bytes)))
+		logStr += fmt.Sprintf(" %s\n", colorize(ansiGrey, string(bytes)))
 	}
 
 	fmt.Fprintln(h.w, logStr)

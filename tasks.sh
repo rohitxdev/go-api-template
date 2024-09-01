@@ -21,38 +21,31 @@ set +o allexport
 
 set -e
 
-menu="
- 1) docker-watch    -  Run development server in docker
+menu=" 1) docker-watch    -  Run development server in docker
  2) docker-build    -  Build docker image
  3) docker-push     -  Push docker image to dockerhub
  4) watch           -  Run go app and watch for changes
- 5) run             -  Run go app without building
+ 5) run             -  Run go app without building (for development)
  6) start           -  Run go app build
- 7) build           -  Build go app (pass \"--release\" to optimize for release)
- 8) test            -  Run tests (pass \"--cover\" to show coverage)
- 9) bench           -  Run benchmarks
-10) checkpoint      -  Create a git checkpoint and push to remote
+ 7) build           -  Build go app (for release)
+ 8) test            -  Run tests
+ 9) test-cover      -  Run tests and show coverage
+10) bench           -  Run benchmarks
+11) checkpoint      -  Create a git checkpoint and push to remote
 "
 
 script_name=${0#$"./"}
 script_path=$(readlink -f "$script_name")
 task=$1
-flag=$2
 
 if [[ -z $task ]]; then
-    printf "\033[1;95m%s\033[94m%s\033[0m%s\n" "Pick a task to run " "(Enter Q to quit)" "$menu"
+    printf "%s\n\033[1;95m%s\033[94m%s\n\033[0m\n" "$menu" "Pick a task to run " "(Enter Q|q to quit)"
     printf "\033[1m%s\033[0m" "Enter option: "
-    read -r task flag
+    read -r task
 fi
 
-if [[ $flag == "--release" ]]; then
-    build="release"
-else
-    build="debug"
-fi
-build_info="$APP_NAME/$APP_VERSION/$build"
-build_release_args=(--ldflags="-s -w -X main.BuildInfo=$build_info -extldflags=-static" --trimpath --buildmode=pie)
-build_debug_args=(--ldflags="-X main.BuildInfo=$build_info" --race)
+build_release_args=(--ldflags="-s -w -X main.BuildInfo=$APP_NAME|$APP_VERSION|release -extldflags=-static" --trimpath --buildmode=pie)
+build_debug_args=(--ldflags="-X main.BuildInfo=$APP_NAME|$APP_VERSION|debug" --race)
 
 while true; do
     case $task in
@@ -73,7 +66,7 @@ while true; do
         break
         ;;
     "watch" | 4)
-        air
+        watchexec --ignore=bin/** --stop-timeout="${SHUTDOWN_TIMEOUT:-10s}" --stop-signal=SIGINT --shell=none --no-vcs-ignore --restart ./tasks.sh run
         break
         ;;
     "run" | 5)
@@ -81,47 +74,32 @@ while true; do
         break
         ;;
     "start" | 6)
-        build="debug"
-        if [[ $flag == "--release" ]]; then
-            build="release"
-        fi
-        if [[ -x "./bin/${build}_build" ]]; then
-            ./bin/"${build}_build"
+        if [[ -x "./bin/build" ]]; then
+            ./bin/"build"
         else
             echo "Build not found. Building..."
             sleep 1
-            $script_path build --$build && ./bin/"${build}_build"
+            $script_path build && ./bin/build
         fi
         break
         ;;
     "build" | 7)
-        build="debug"
-        if [[ $flag == "--release" ]]; then
-            build="release"
-        fi
-        echo "Building app..."
-        if [[ $build == "release" ]]; then
-            CGO_ENABLED=0 go build "${build_release_args[@]}" -o ./bin/${build}_build ./main.go
-        else
-            go build "${build_debug_args[@]}" -o ./bin/${build}_build ./main.go
-        fi
-        echo "Built app successfully ✔"
-        echo "$build_info"
+        echo "Building app..." && CGO_ENABLED=0 go build "${build_release_args[@]}" -o ./bin/build ./main.go && echo "Built app successfully ✔"
         break
         ;;
     "test" | 8)
-        if [[ $flag != "--cover" ]]; then
-            go test --race --count=2 -v ./...
-        else
-            go test --race --coverprofile=./tmp/coverage.out ./... && go tool cover --html=./tmp/coverage.out
-        fi
+        go test --race --count=2 -v ./...
         break
         ;;
-    "bench" | 9)
+    "test-cover" | 9)
+        go test --race --coverprofile=./tmp/coverage.out ./... && go tool cover --html=./tmp/coverage.out
+        break
+        ;;
+    "bench" | 10)
         go test --race --count=2 -v -benchmem --bench=. ./...
         break
         ;;
-    "checkpoint" | 10)
+    "checkpoint" | 11)
         git add . && git commit -m "Checkpoint at $(date "+%Y-%m-%dT%H:%M:%S%z")" && git push && echo "Checkpoint created and pushed to remote ✔"
         break
         ;;

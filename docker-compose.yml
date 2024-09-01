@@ -2,7 +2,7 @@ services:
   api:
     build:
       context: .
-      target: dev
+      target: development
       args:
         GO_VERSION: ${GO_VERSION}
     volumes:
