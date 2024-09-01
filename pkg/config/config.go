@@ -100,7 +100,7 @@ func Load(envFilePath string) (*Server, error) {
 		RateLimitPerMinute:    int(rateLimitPerMinute),
 
 		SmtpPort: int(smtpPort),
-		IsDev:    os.Getenv("APP_ENV") != "production",
+		IsDev:    os.Getenv("ENV") != "production",
 	}
 
 	if err := validator.New().Struct(c); err != nil {
