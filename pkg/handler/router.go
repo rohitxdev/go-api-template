@@ -146,9 +146,13 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 		}},
 	))
 
+	host, err := os.Hostname()
+	if err != nil {
+		return nil, errors.Join(errors.New("could not get host name"), err)
+	}
+
 	e.Pre(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogRequestID:     true,
-		LogHost:          true,
 		LogRemoteIP:      true,
 		LogProtocol:      true,
 		LogURI:           true,
@@ -172,7 +176,7 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 				"http request",
 				slog.Group("request",
 					slog.String("id", v.RequestID),
-					slog.String("host", v.Host),
+					slog.String("host", host),
 					slog.String("clientIp", v.RemoteIP),
 					slog.String("protocol", v.Protocol),
 					slog.String("uri", v.URI),
@@ -180,7 +184,7 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 					slog.String("referer", v.Referer),
 					slog.String("userAgent", v.UserAgent),
 					slog.String("contentLength", v.ContentLength),
-					slog.Duration("durationMs", v.Latency.Round(time.Millisecond)),
+					slog.Duration("durationMs", time.Duration(v.Latency.Milliseconds())),
 				),
 				slog.Group("response",
 					slog.Int("status", v.Status),
@@ -193,11 +197,6 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 			return nil
 		},
 	}))
-
-	host, err := os.Hostname()
-	if err != nil {
-		return nil, errors.Join(errors.New("could not get host name"), err)
-	}
 
 	data := map[string]string{
 		"build": h.config.BuildInfo,
