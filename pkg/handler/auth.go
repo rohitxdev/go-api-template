@@ -21,12 +21,12 @@ func (h *Handler) GetAccessToken(c echo.Context) error {
 	if err != nil {
 		return c.String(http.StatusUnauthorized, ErrUserNotLoggedIn.Error())
 	}
-	userId, err := util.VerifyJWT(refreshToken.Value, h.config.JWT_SECRET)
+	userId, err := util.VerifyJWT(refreshToken.Value, h.config.JwtSecret)
 	if err != nil {
 		c.SetCookie(util.CreateLogOutCookie())
 		return c.String(http.StatusUnauthorized, err.Error())
 	}
-	accessToken, _ := util.GenerateJWT(userId, h.config.ACCESS_TOKEN_EXPIRES_IN, h.config.JWT_SECRET)
+	accessToken, _ := util.GenerateJWT(userId, h.config.AccessTokenExpiresIn, h.config.JwtSecret)
 	return c.JSON(http.StatusOK, echo.Map{"access_token": accessToken})
 }
 
@@ -60,8 +60,8 @@ func (h *Handler) LogIn(c echo.Context) error {
 	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		return c.String(http.StatusUnauthorized, err.Error())
 	}
-	accessToken, refreshToken := util.GenerateAccessAndRefreshTokens(user.Id, h.config.ACCESS_TOKEN_EXPIRES_IN, h.config.REFRESH_TOKEN_EXPIRES_IN, h.config.JWT_SECRET)
-	c.SetCookie(util.CreateLogInCookie(refreshToken, h.config.REFRESH_TOKEN_EXPIRES_IN))
+	accessToken, refreshToken := util.GenerateAccessAndRefreshTokens(user.Id, h.config.AccessTokenExpiresIn, h.config.RefreshTokenExpiresIn, h.config.JwtSecret)
+	c.SetCookie(util.CreateLogInCookie(refreshToken, h.config.RefreshTokenExpiresIn))
 	return c.JSON(http.StatusOK, LogInResponse{AccessToken: accessToken})
 }
 
@@ -91,8 +91,8 @@ func (h *Handler) SignUp(c echo.Context) error {
 	if err != nil {
 		return c.String(http.StatusBadRequest, err.Error())
 	}
-	accessToken, refreshToken := util.GenerateAccessAndRefreshTokens(userId, h.config.ACCESS_TOKEN_EXPIRES_IN, h.config.REFRESH_TOKEN_EXPIRES_IN, h.config.JWT_SECRET)
-	c.SetCookie(util.CreateLogInCookie(refreshToken, h.config.REFRESH_TOKEN_EXPIRES_IN))
+	accessToken, refreshToken := util.GenerateAccessAndRefreshTokens(userId, h.config.AccessTokenExpiresIn, h.config.RefreshTokenExpiresIn, h.config.JwtSecret)
+	c.SetCookie(util.CreateLogInCookie(refreshToken, h.config.RefreshTokenExpiresIn))
 	return c.JSON(http.StatusCreated, SignUpResponse{AccessToken: accessToken})
 }
 
@@ -101,7 +101,7 @@ func (h *Handler) SendPasswordChangeEmail(c echo.Context) error {
 	if !ok {
 		return c.String(http.StatusUnauthorized, ErrUserNotLoggedIn.Error())
 	}
-	token, _ := util.GenerateJWT(user.Id, time.Minute*10, h.config.JWT_SECRET)
+	token, _ := util.GenerateJWT(user.Id, time.Minute*10, h.config.JwtSecret)
 	u, _ := url.Parse("/v1/auth/change-password")
 	q := u.Query()
 	q.Set("token", token)
@@ -123,7 +123,7 @@ func (h *Handler) ResetPassword(c echo.Context) error {
 	if err := util.BindAndValidate(c, req); err != nil {
 		return err
 	}
-	userId, err := util.VerifyJWT(req.Token, h.config.JWT_SECRET)
+	userId, err := util.VerifyJWT(req.Token, h.config.JwtSecret)
 	if err != nil {
 		return c.String(http.StatusBadRequest, err.Error())
 	}

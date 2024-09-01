@@ -58,9 +58,9 @@ func (h *Handler) OAuth2LogIn(c echo.Context) error {
 
 	switch req.Provider {
 	case "google":
-		return c.Redirect(http.StatusTemporaryRedirect, h.config.GOOGLE_OAUTH2_CONFIG.AuthCodeURL(oAuth2State, oauth2.ApprovalForce))
+		return c.Redirect(http.StatusTemporaryRedirect, h.config.GoogleOAuth2Config.AuthCodeURL(oAuth2State, oauth2.ApprovalForce))
 	case "github":
-		return c.Redirect(http.StatusTemporaryRedirect, h.config.GITHUB_OAUTH2_CONFIG.AuthCodeURL(oAuth2State, oauth2.ApprovalForce))
+		return c.Redirect(http.StatusTemporaryRedirect, h.config.GitHubOAuth2Config.AuthCodeURL(oAuth2State, oauth2.ApprovalForce))
 	default:
 		return c.String(http.StatusUnprocessableEntity, "invalid provider")
 	}
@@ -81,9 +81,9 @@ func (h *Handler) OAuth2Callback(c echo.Context) error {
 
 	switch req.Provider {
 	case "google":
-		email, err = h.GetOAuth2UserEmail(c, h.config.GOOGLE_OAUTH2_CONFIG, "https://www.googleapis.com/oauth2/v2/userinfo")
+		email, err = h.GetOAuth2UserEmail(c, h.config.GoogleOAuth2Config, "https://www.googleapis.com/oauth2/v2/userinfo")
 	case "github":
-		email, err = h.GetOAuth2UserEmail(c, h.config.GITHUB_OAUTH2_CONFIG, "https://api.github.com/user")
+		email, err = h.GetOAuth2UserEmail(c, h.config.GitHubOAuth2Config, "https://api.github.com/user")
 	default:
 		return c.String(http.StatusUnprocessableEntity, "invalid provider")
 	}
@@ -103,10 +103,10 @@ func (h *Handler) OAuth2Callback(c echo.Context) error {
 	// }
 	// return  err
 	// }
-	accessToken, refreshToken := util.GenerateAccessAndRefreshTokens(user.Id, h.config.ACCESS_TOKEN_EXPIRES_IN, h.config.REFRESH_TOKEN_EXPIRES_IN, h.config.JWT_SECRET)
+	accessToken, refreshToken := util.GenerateAccessAndRefreshTokens(user.Id, h.config.AccessTokenExpiresIn, h.config.RefreshTokenExpiresIn, h.config.JwtSecret)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
-	c.SetCookie(util.CreateLogInCookie(refreshToken, h.config.REFRESH_TOKEN_EXPIRES_IN))
+	c.SetCookie(util.CreateLogInCookie(refreshToken, h.config.RefreshTokenExpiresIn))
 	return c.JSON(http.StatusOK, echo.Map{"access_token": accessToken})
 }

@@ -39,13 +39,13 @@ script_path=$(readlink -f "$script_name")
 task=$1
 
 if [[ -z $task ]]; then
-    printf "%s\n\033[1;95m%s\033[94m%s\n\033[0m\n" "$menu" "Pick a task to run " "(Enter Q|q to quit)"
+    printf "%s\n\033[1;95m%s\033[94m%s\n\033[0m\n" """$menu""" "Pick a task to run " "(Enter Q|q to quit)"
     printf "\033[1m%s\033[0m" "Enter option: "
     read -r task
 fi
 
-build_release_args=(--ldflags="-s -w -X main.BuildInfo=$APP_NAME|$APP_VERSION|release -extldflags=-static" --trimpath --buildmode=pie)
-build_debug_args=(--ldflags="-X main.BuildInfo=$APP_NAME|$APP_VERSION|debug" --race)
+build_debug_args=(--ldflags="-X $PACKAGE_NAME/pkg/config.BuildInfo=$APP_NAME::$APP_VERSION::debug" --race)
+build_release_args=(--ldflags="-s -w -X $PACKAGE_NAME/pkg/config.BuildInfo=$APP_NAME::$APP_VERSION::release -extldflags=-static" --trimpath --buildmode=pie)
 
 while true; do
     case $task in

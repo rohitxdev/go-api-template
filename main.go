@@ -17,9 +17,6 @@ import (
 	"github.com/rohitxdev/go-api-template/pkg/repo"
 )
 
-// Build info
-var BuildInfo string
-
 //go:embed templates public
 var staticFS embed.FS
 
@@ -34,7 +31,7 @@ func main() {
 	logOpts := slog.HandlerOptions{
 		Level: slog.LevelDebug,
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			if a.Value.String() == "" {
+			if a.Value.String() == "" || a.Value.Equal(slog.AnyValue(nil)) {
 				return slog.Attr{}
 			}
 			return a
@@ -42,16 +39,16 @@ func main() {
 	}
 
 	var logHandler slog.Handler = slog.NewJSONHandler(os.Stderr, &logOpts)
-	if cfg.IS_DEV {
+	if cfg.IsDev {
 		logHandler = prettylog.NewHandler(os.Stderr, &logOpts)
 	}
 
 	slog.SetDefault(slog.New(logHandler))
 
-	slog.Debug(BuildInfo + " is running in " + cfg.APP_ENV + " environment")
+	slog.Debug(cfg.BuildInfo + " is running in " + cfg.Env + " environment")
 
 	//Connect to database
-	db, err := sql.Open("postgres", cfg.DB_URL)
+	db, err := sql.Open("postgres", cfg.DatabaseUrl)
 	if err != nil {
 		panic("connect to database: " + err.Error())
 	}
@@ -74,7 +71,7 @@ func main() {
 	}
 
 	//Create tcp listener
-	ls, err := net.Listen("tcp", cfg.HOST+":"+cfg.PORT)
+	ls, err := net.Listen("tcp", cfg.Host+":"+cfg.Port)
 	if err != nil {
 		panic("tcp listen: " + err.Error())
 	}
@@ -101,7 +98,7 @@ func main() {
 
 	<-ctx.Done()
 
-	ctx, cancel = context.WithTimeout(context.Background(), cfg.SHUTDOWN_TIMEOUT)
+	ctx, cancel = context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
 
 	if err := e.Shutdown(ctx); err != nil {

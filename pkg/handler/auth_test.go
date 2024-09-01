@@ -22,7 +22,7 @@ func TestAuth(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	db, err := sql.Open("postgres", cfg.DB_URL)
+	db, err := sql.Open("postgres", cfg.DatabaseUrl)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -16,6 +16,7 @@ import (
 	"github.com/labstack/echo-contrib/pprof"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/rohitxdev/go-api-template/pkg/config"
 	"github.com/rohitxdev/go-api-template/pkg/id"
 	"github.com/rohitxdev/go-api-template/pkg/repo"
 	"golang.org/x/time/rate"
@@ -90,20 +91,18 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 		echo.TrustPrivateNet(false), // e.g. ipv4 start with 10. or 192.168
 	)
 
+	e.Pre(middleware.CSRF())
+
 	e.Pre(middleware.StaticWithConfig(middleware.StaticConfig{
 		Root:       "public",
 		Filesystem: http.FS(h.staticFS),
 	}))
 
-	e.Pre(middleware.Recover())
-
 	e.Pre(middleware.Secure())
 
-	if h.config.IS_DEV {
+	if h.config.IsDev {
 		e.Pre(middleware.CORSWithConfig(middleware.CORSConfig{AllowOrigins: []string{"*"}}))
 	}
-
-	e.Pre(middleware.CSRF())
 
 	e.Pre(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
 		Timeout: 5 * time.Second, Skipper: func(c echo.Context) bool {
@@ -116,6 +115,36 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 			return id.New(id.Request)
 		},
 	}))
+
+	if h.config.RateLimitPerMinute > 0 {
+		e.Pre(middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
+			Store: middleware.NewRateLimiterMemoryStoreWithConfig(middleware.RateLimiterMemoryStoreConfig{
+				Rate:      rate.Limit(h.config.RateLimitPerMinute),
+				ExpiresIn: time.Minute,
+			})}))
+	}
+
+	// Gzip compression & decompression
+
+	e.Use(middleware.GzipWithConfig(middleware.GzipConfig{Skipper: func(c echo.Context) bool {
+		return !strings.Contains(c.Request().Header.Get("Accept-Encoding"), "gzip")
+	}}))
+
+	e.Pre(middleware.Decompress())
+
+	pprof.Register(e)
+
+	e.Pre(middleware.RecoverWithConfig(middleware.RecoverConfig{
+		LogErrorFunc: func(c echo.Context, err error, stack []byte) error {
+			slog.ErrorContext(
+				c.Request().Context(),
+				"panic recover",
+				slog.Any("error", err),
+				slog.Any("stack", string(stack)),
+			)
+			return nil
+		}},
+	))
 
 	e.Pre(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogRequestID:     true,
@@ -150,6 +179,7 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 					slog.String("method", v.Method),
 					slog.String("referer", v.Referer),
 					slog.String("userAgent", v.UserAgent),
+					slog.String("contentLength", v.ContentLength),
 					slog.Duration("durationMs", v.Latency.Round(time.Millisecond)),
 				),
 				slog.Group("response",
@@ -157,7 +187,6 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 					slog.Int64("sizeBytes", v.ResponseSize),
 				),
 				slog.String("userId", userId),
-				slog.Any("cookies", c.Cookies()),
 				slog.Any("error", v.Error),
 			)
 
@@ -165,32 +194,15 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 		},
 	}))
 
-	if h.config.RATE_LIMIT_PER_MINUTE > 0 {
-		e.Pre(middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
-			Store: middleware.NewRateLimiterMemoryStoreWithConfig(middleware.RateLimiterMemoryStoreConfig{
-				Rate:      rate.Limit(h.config.RATE_LIMIT_PER_MINUTE),
-				ExpiresIn: time.Minute,
-			})}))
-	}
-
-	// Gzip compression & decompression
-
-	e.Use(middleware.GzipWithConfig(middleware.GzipConfig{Skipper: func(c echo.Context) bool {
-		return !strings.Contains(c.Request().Header.Get("Accept-Encoding"), "gzip")
-	}}))
-
-	e.Pre(middleware.Decompress())
-
-	pprof.Register(e)
-
 	host, err := os.Hostname()
 	if err != nil {
 		return nil, errors.Join(errors.New("could not get host name"), err)
 	}
 
 	data := map[string]string{
-		"env":  h.config.APP_ENV,
-		"host": host,
+		"build": h.config.BuildInfo,
+		"env":   h.config.Env,
+		"host":  host,
 	}
 
 	e.GET("/", func(c echo.Context) error {
@@ -203,7 +215,12 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 
 	v1 := e.Group("/v1")
 	{
-		v1.GET("/config", h.GetConfig)
+		v1.GET("/config", func(c echo.Context) error {
+			clientConfig := config.Client{
+				Env: h.config.Env,
+			}
+			return c.JSON(http.StatusOK, clientConfig)
+		})
 	}
 
 	return e, nil

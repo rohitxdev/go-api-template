@@ -17,7 +17,7 @@ func (h *Handler) GetFile(c echo.Context) error {
 	if err := util.BindAndValidate(c, req); err != nil {
 		return err
 	}
-	file, err := h.fs.Get(c.Request().Context(), h.config.S3_BUCKET_NAME, req.FileName)
+	file, err := h.fs.Get(c.Request().Context(), h.config.S3BucketName, req.FileName)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
@@ -46,7 +46,7 @@ func (h *Handler) PutFile(c echo.Context) error {
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
-	err = h.fs.Upload(c.Request().Context(), h.config.S3_BUCKET_NAME, file.Filename, fileContent)
+	err = h.fs.Upload(c.Request().Context(), h.config.S3BucketName, file.Filename, fileContent)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
@@ -54,7 +54,7 @@ func (h *Handler) PutFile(c echo.Context) error {
 }
 
 func (h *Handler) GetFileList(c echo.Context) error {
-	files, err := h.fs.GetList(c.Request().Context(), h.config.S3_BUCKET_NAME, "")
+	files, err := h.fs.GetList(c.Request().Context(), h.config.S3BucketName, "")
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}

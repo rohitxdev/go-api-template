@@ -37,7 +37,7 @@ func (h *Handler) Auth(role role) echo.MiddlewareFunc {
 			if accessToken == "" {
 				return c.String(http.StatusUnauthorized, "invalid bearer token")
 			}
-			userId, err := util.VerifyJWT(accessToken, h.config.JWT_SECRET)
+			userId, err := util.VerifyJWT(accessToken, h.config.JwtSecret)
 			if err != nil {
 				return c.String(http.StatusUnauthorized, err.Error())
 			}
