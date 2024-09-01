@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"embed"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -25,8 +24,6 @@ var BuildInfo string
 var staticFS embed.FS
 
 func main() {
-	fmt.Println()
-
 	//Load config
 	cfg, err := config.Load(".env")
 	if err != nil {
@@ -103,7 +100,6 @@ func main() {
 	defer cancel()
 
 	<-ctx.Done()
-	fmt.Println()
 
 	ctx, cancel = context.WithTimeout(context.Background(), cfg.SHUTDOWN_TIMEOUT)
 	defer cancel()
