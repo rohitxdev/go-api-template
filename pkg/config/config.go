@@ -77,9 +77,11 @@ func Load(envFilePath string) (*Server, error) {
 		return nil, errors.Join(errors.New("parse rate limit"), err)
 	}
 
+	env := os.Getenv("ENV")
+
 	c := Server{
 		BuildInfo:             BuildInfo,
-		Env:                   os.Getenv("ENV"),
+		Env:                   env,
 		Host:                  os.Getenv("HOST"),
 		Port:                  os.Getenv("PORT"),
 		JwtSecret:             os.Getenv("JWT_SECRET"),
@@ -98,9 +100,8 @@ func Load(envFilePath string) (*Server, error) {
 		RefreshTokenExpiresIn: refreshTokenExpiresIn,
 		ShutdownTimeout:       shutdownTimeout,
 		RateLimitPerMinute:    int(rateLimitPerMinute),
-
-		SmtpPort: int(smtpPort),
-		IsDev:    os.Getenv("ENV") != "production",
+		SmtpPort:              int(smtpPort),
+		IsDev:                 env != "production",
 	}
 
 	if err := validator.New().Struct(c); err != nil {
