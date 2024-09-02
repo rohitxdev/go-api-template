@@ -13,6 +13,7 @@ import (
 
 	"github.com/rohitxdev/go-api-template/pkg/config"
 	"github.com/rohitxdev/go-api-template/pkg/handler"
+	"github.com/rohitxdev/go-api-template/pkg/kv"
 	"github.com/rohitxdev/go-api-template/pkg/prettylog"
 	"github.com/rohitxdev/go-api-template/pkg/repo"
 )
@@ -61,9 +62,15 @@ func main() {
 
 	slog.Debug("connected to database ✔︎")
 
-	//Create handler
+	//Create kv store
+	kv, err := kv.New("kv")
+	if err != nil {
+		panic("create kv store: " + err.Error())
+	}
 	r := repo.New(db)
-	h := handler.New(cfg, r, &staticFS)
+
+	//Create handler
+	h := handler.New(cfg, kv, r, &staticFS)
 
 	e, err := handler.NewRouter(h)
 	if err != nil {

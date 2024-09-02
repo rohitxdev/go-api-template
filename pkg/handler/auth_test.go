@@ -29,7 +29,7 @@ func TestAuth(t *testing.T) {
 	defer db.Close()
 
 	r := repo.New(db)
-	h := handler.New(cfg, r, nil)
+	h := handler.New(cfg, nil, r, nil)
 	e, err := handler.NewRouter(h)
 	if err != nil {
 		t.Fatal(err)

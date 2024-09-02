@@ -1,19 +1,18 @@
-package repo
+package kv
 
 import (
 	"database/sql"
-	"fmt"
 )
 
-type kv struct {
+type KV struct {
 	db      *sql.DB
 	getStmt *sql.Stmt
 	setStmt *sql.Stmt
 	name    string
 }
 
-func NewKV(name string) (*kv, error) {
-	db, err := NewSqlite(fmt.Sprintf("db/%s.db", name))
+func New(name string) (*KV, error) {
+	db, err := newSqliteDb(name + ".db")
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +30,7 @@ func NewKV(name string) (*kv, error) {
 		return nil, err
 	}
 
-	return &kv{
+	return &KV{
 		db:      db,
 		name:    name,
 		getStmt: getStmt,
@@ -39,7 +38,7 @@ func NewKV(name string) (*kv, error) {
 	}, nil
 }
 
-func (kv *kv) Get(key string) (string, error) {
+func (kv *KV) Get(key string) (string, error) {
 	var value string
 	err := kv.getStmt.QueryRow(key).Scan(&value)
 	if err != nil {
@@ -51,15 +50,7 @@ func (kv *kv) Get(key string) (string, error) {
 	return value, nil
 }
 
-func (kv *kv) Set(key string, value string) error {
+func (kv *KV) Set(key string, value string) error {
 	_, err := kv.setStmt.Exec(key, value)
 	return err
 }
-
-var KV = func() *kv {
-	kv, err := NewKV("kv")
-	if err != nil {
-		panic("create kv store: " + err.Error())
-	}
-	return kv
-}()
