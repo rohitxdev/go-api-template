@@ -113,7 +113,7 @@ func Load(envFilePath string) (*Server, error) {
 			ClientID:     c.GoogleClientId,
 			ClientSecret: c.GoogleClientSecret,
 			Endpoint:     google.Endpoint,
-			RedirectURL:  "https://localhost:8443/v1/auth/oauth2/callback/google",
+			RedirectURL:  fmt.Sprintf("https://%s/v1/auth/oauth2/callback/google", c.Host+":"+c.Port),
 			Scopes:       []string{"openid email", "openid profile"},
 		}
 	}

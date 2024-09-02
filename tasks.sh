@@ -66,11 +66,11 @@ while true; do
         break
         ;;
     "watch" | 4)
-        watchexec --ignore=bin/** --stop-timeout="${SHUTDOWN_TIMEOUT:-10s}" --stop-signal=SIGINT --shell=none --no-vcs-ignore --restart ./tasks.sh run
+        watchexec --stop-timeout="${SHUTDOWN_TIMEOUT:-10s}" --stop-signal=SIGINT --shell=none --restart ./tasks.sh run
         break
         ;;
     "run" | 5)
-        go run "${build_debug_args[@]}" .
+        CGO_ENABLED=0 go run "${build_debug_args[@]}" .
         break
         ;;
     "start" | 6)

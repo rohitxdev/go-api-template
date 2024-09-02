@@ -209,7 +209,8 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 	})
 
 	e.GET("/ping", func(c echo.Context) error {
-		return c.String(http.StatusOK, "pong")
+		v, _ := repo.KV.Get("ping")
+		return c.String(http.StatusOK, v)
 	})
 
 	v1 := e.Group("/v1")

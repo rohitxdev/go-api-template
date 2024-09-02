@@ -14,14 +14,29 @@ require (
 	github.com/labstack/echo-contrib v0.17.1
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/lib/pq v1.10.9
+	github.com/markbates/goth v1.80.0
 	github.com/oklog/ulid/v2 v2.1.0
 	golang.org/x/crypto v0.26.0
 	golang.org/x/oauth2 v0.22.0
 	golang.org/x/time v0.6.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
+	modernc.org/sqlite v1.32.0
 )
 
-require github.com/google/go-cmp v0.6.0 // indirect
+require (
+	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/google/uuid v1.6.0 // indirect
+	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
+	github.com/ncruces/go-strftime v0.1.9 // indirect
+	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
+	modernc.org/gc/v3 v3.0.0-20240801135723-a856999a2e4a // indirect
+	modernc.org/libc v1.60.1 // indirect
+	modernc.org/mathutil v1.6.0 // indirect
+	modernc.org/memory v1.8.0 // indirect
+	modernc.org/strutil v1.2.0 // indirect
+	modernc.org/token v1.1.0 // indirect
+)
 
 require (
 	cloud.google.com/go/compute/metadata v0.5.0 // indirect
