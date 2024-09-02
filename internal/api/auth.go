@@ -1,4 +1,4 @@
-package handler
+package api
 
 import (
 	"errors"
@@ -23,7 +23,7 @@ func (h *Handler) GetAccessToken(c echo.Context) error {
 	}
 	userId, err := util.VerifyJWT(refreshToken.Value, h.config.JwtSecret)
 	if err != nil {
-		c.SetCookie(util.CreateLogOutCookie())
+		c.SetCookie(createLogOutCookie())
 		return c.String(http.StatusUnauthorized, err.Error())
 	}
 	accessToken, _ := util.GenerateJWT(userId, h.config.AccessTokenExpiresIn, h.config.JwtSecret)
@@ -35,7 +35,7 @@ func (h *Handler) LogOut(c echo.Context) error {
 	if err != nil {
 		return c.String(http.StatusBadRequest, ErrUserNotLoggedIn.Error())
 	}
-	c.SetCookie(util.CreateLogOutCookie())
+	c.SetCookie(createLogOutCookie())
 	return c.String(http.StatusOK, "Logged out")
 }
 
@@ -50,7 +50,7 @@ type LogInResponse struct {
 
 func (h *Handler) LogIn(c echo.Context) error {
 	req := new(LogInRequest)
-	if err := util.BindAndValidate(c, req); err != nil {
+	if err := bindAndValidate(c, req); err != nil {
 		return err
 	}
 	user, err := h.repo.GetUserByEmail(c.Request().Context(), util.SanitizeEmail(req.Email))
@@ -61,7 +61,7 @@ func (h *Handler) LogIn(c echo.Context) error {
 		return c.String(http.StatusUnauthorized, err.Error())
 	}
 	accessToken, refreshToken := util.GenerateAccessAndRefreshTokens(user.Id, h.config.AccessTokenExpiresIn, h.config.RefreshTokenExpiresIn, h.config.JwtSecret)
-	c.SetCookie(util.CreateLogInCookie(refreshToken, h.config.RefreshTokenExpiresIn))
+	c.SetCookie(createLogInCookie(refreshToken, h.config.RefreshTokenExpiresIn))
 	return c.JSON(http.StatusOK, LogInResponse{AccessToken: accessToken})
 }
 
@@ -77,7 +77,7 @@ type SignUpResponse struct {
 
 func (h *Handler) SignUp(c echo.Context) error {
 	req := new(SignUpRequest)
-	if err := util.BindAndValidate(c, req); err != nil {
+	if err := bindAndValidate(c, req); err != nil {
 		return err
 	}
 	user := new(repo.UserCore)
@@ -92,7 +92,7 @@ func (h *Handler) SignUp(c echo.Context) error {
 		return c.String(http.StatusBadRequest, err.Error())
 	}
 	accessToken, refreshToken := util.GenerateAccessAndRefreshTokens(userId, h.config.AccessTokenExpiresIn, h.config.RefreshTokenExpiresIn, h.config.JwtSecret)
-	c.SetCookie(util.CreateLogInCookie(refreshToken, h.config.RefreshTokenExpiresIn))
+	c.SetCookie(createLogInCookie(refreshToken, h.config.RefreshTokenExpiresIn))
 	return c.JSON(http.StatusCreated, SignUpResponse{AccessToken: accessToken})
 }
 
@@ -120,7 +120,7 @@ type ResetPasswordRequest struct {
 
 func (h *Handler) ResetPassword(c echo.Context) error {
 	req := new(ResetPasswordRequest)
-	if err := util.BindAndValidate(c, req); err != nil {
+	if err := bindAndValidate(c, req); err != nil {
 		return err
 	}
 	userId, err := util.VerifyJWT(req.Token, h.config.JwtSecret)

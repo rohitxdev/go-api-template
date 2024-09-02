@@ -11,24 +11,6 @@ import (
 	"unicode/utf8"
 )
 
-func Tern[T any](exp bool, trueValue T, falseValue T) T {
-	if exp {
-		return trueValue
-	}
-	return falseValue
-}
-
-func Coalesce[T any](values ...T) T {
-	var res T
-	for _, v := range values {
-		res = v
-		if !reflect.ValueOf(&v).Elem().IsZero() {
-			break
-		}
-	}
-	return res
-}
-
 func RandInt(min int, max int) int {
 	return min + rand.Intn(max-min)
 }
@@ -73,7 +55,11 @@ func PrintTableJSON(v any) {
 	count := 0
 	for key, value := range jsonMap {
 		count++
-		s := fmt.Sprintf("| %-40.40v | %-40.40v |", key, Tern(reflect.TypeOf(value).Kind() == reflect.Map, "__invalid_type__", value))
+		data := value
+		if reflect.TypeOf(value).Kind() == reflect.Map {
+			data = "__invalid_type__"
+		}
+		s := fmt.Sprintf("| %-40.40v | %-40.40v |", key, data)
 		fmt.Println(strings.Repeat("-", utf8.RuneCountInString(s)))
 		fmt.Println(s)
 		if count == len(jsonMap) {

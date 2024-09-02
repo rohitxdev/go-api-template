@@ -1,11 +1,10 @@
-package handler
+package api
 
 import (
 	"io"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"github.com/rohitxdev/go-api-template/pkg/util"
 )
 
 type getFileRequest struct {
@@ -14,7 +13,7 @@ type getFileRequest struct {
 
 func (h *Handler) GetFile(c echo.Context) error {
 	req := new(getFileRequest)
-	if err := util.BindAndValidate(c, req); err != nil {
+	if err := bindAndValidate(c, req); err != nil {
 		return err
 	}
 	file, err := h.fs.Get(c.Request().Context(), h.config.S3BucketName, req.FileName)
@@ -30,7 +29,7 @@ type putFileRequest struct {
 
 func (h *Handler) PutFile(c echo.Context) error {
 	req := new(putFileRequest)
-	if err := util.BindAndValidate(c, req); err != nil {
+	if err := bindAndValidate(c, req); err != nil {
 		return err
 	}
 	file, err := c.FormFile("file")

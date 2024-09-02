@@ -1,4 +1,4 @@
-package handler_test
+package api_test
 
 import (
 	"bytes"
@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	"github.com/labstack/echo/v4"
+	"github.com/rohitxdev/go-api-template/internal/api"
 	"github.com/rohitxdev/go-api-template/pkg/config"
-	"github.com/rohitxdev/go-api-template/pkg/handler"
 	"github.com/rohitxdev/go-api-template/pkg/repo"
 )
 
@@ -29,8 +29,8 @@ func TestAuth(t *testing.T) {
 	defer db.Close()
 
 	r := repo.New(db)
-	h := handler.New(cfg, nil, r, nil)
-	e, err := handler.NewRouter(h)
+	h := api.New(cfg, nil, r, nil, nil, nil)
+	e, err := api.NewRouter(h)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestAuth(t *testing.T) {
 		if res.Code != http.StatusCreated {
 			t.Error(res.Body.String())
 		}
-		var data handler.LogInResponse
+		var data api.LogInResponse
 		_ = json.Unmarshal(res.Body.Bytes(), &data)
 		accessToken = data.AccessToken
 		for _, cookie := range res.Result().Cookies() {
@@ -70,7 +70,7 @@ func TestAuth(t *testing.T) {
 		if res.Code != http.StatusOK {
 			t.Error(res.Body.String())
 		}
-		var data handler.LogInResponse
+		var data api.LogInResponse
 		_ = json.Unmarshal(res.Body.Bytes(), &data)
 		accessToken = data.AccessToken
 		refreshTokenCookie = nil
@@ -105,7 +105,7 @@ func TestAuth(t *testing.T) {
 			t.Error(err)
 		}
 		res := httptest.NewRecorder()
-		authMiddleware := h.Auth(handler.RoleUser)
+		authMiddleware := h.Auth(api.RoleUser)
 		c := e.NewContext(req, res)
 		_ = authMiddleware(h.DeleteAccount)(c)
 		if res.Code != http.StatusOK {

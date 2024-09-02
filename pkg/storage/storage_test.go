@@ -1,4 +1,4 @@
-package service_test
+package storage_test
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/rohitxdev/go-api-template/pkg/config"
-	"github.com/rohitxdev/go-api-template/pkg/service"
+	"github.com/rohitxdev/go-api-template/pkg/storage"
 )
 
 func TestStorageService(t *testing.T) {
@@ -17,7 +17,7 @@ func TestStorageService(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	fs, err := service.NewFileStorage(cfg.S3Endpoint, cfg.S3DefaultRegion, cfg.AwsAccessKeyId, cfg.AwsAccessKeySecret)
+	fs, err := storage.New(cfg.S3Endpoint, cfg.S3DefaultRegion, cfg.AwsAccessKeyId, cfg.AwsAccessKeySecret)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestStorageService(t *testing.T) {
 			t.Error(err)
 		}
 		if !bytes.Equal(fileContent, testFileContent) {
-			t.Error(service.ErrFileEmpty)
+			t.Error(storage.ErrFileEmpty)
 		}
 	})
 

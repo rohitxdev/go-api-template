@@ -1,4 +1,4 @@
-package service
+package email
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ func NewSMTPClient(host string, port int, username string, password string) *gom
 	return gomail.NewDialer(host, port, username, password)
 }
 
-type EmailClient struct {
+type Client struct {
 	dialer *gomail.Dialer
 }
 
@@ -27,7 +27,7 @@ type Email struct {
 	Bcc         []string
 }
 
-func (e *EmailClient) SendEmail(email *Email) error {
+func (c *Client) SendEmail(email *Email) error {
 	msg := gomail.NewMessage()
 	msg.SetHeaders(map[string][]string{
 		"From":    {msg.FormatAddress(email.FromAddress, email.FromName)},
@@ -37,7 +37,7 @@ func (e *EmailClient) SendEmail(email *Email) error {
 		"Bcc":     email.Bcc,
 	})
 	msg.SetBody(email.ContentType, email.Body)
-	if err := e.dialer.DialAndSend(msg); err != nil {
+	if err := c.dialer.DialAndSend(msg); err != nil {
 		return fmt.Errorf("could not send email: %w", err)
 	}
 	return nil

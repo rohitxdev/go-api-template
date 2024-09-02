@@ -1,4 +1,4 @@
-package handler
+package api
 
 import (
 	"net/http"
@@ -30,7 +30,7 @@ func (h *Handler) Auth(role role) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			req := new(AuthRequest)
-			if err := util.BindAndValidate(c, req); err != nil {
+			if err := bindAndValidate(c, req); err != nil {
 				return err
 			}
 			accessToken := strings.Split(req.Authorization, " ")[1]

@@ -1,4 +1,4 @@
-package handler
+package api
 
 import (
 	"encoding/json"
@@ -52,7 +52,7 @@ type OAuth2LogInRequest struct {
 
 func (h *Handler) OAuth2LogIn(c echo.Context) error {
 	req := new(OAuth2LogInRequest)
-	if err := util.BindAndValidate(c, req); err != nil {
+	if err := bindAndValidate(c, req); err != nil {
 		return err
 	}
 
@@ -72,7 +72,7 @@ type OAuth2CallbackRequest struct {
 
 func (h *Handler) OAuth2Callback(c echo.Context) error {
 	req := new(OAuth2CallbackRequest)
-	if err := util.BindAndValidate(c, req); err != nil {
+	if err := bindAndValidate(c, req); err != nil {
 		return err
 	}
 
@@ -107,6 +107,6 @@ func (h *Handler) OAuth2Callback(c echo.Context) error {
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
-	c.SetCookie(util.CreateLogInCookie(refreshToken, h.config.RefreshTokenExpiresIn))
+	c.SetCookie(createLogInCookie(refreshToken, h.config.RefreshTokenExpiresIn))
 	return c.JSON(http.StatusOK, echo.Map{"access_token": accessToken})
 }

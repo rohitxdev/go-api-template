@@ -1,4 +1,4 @@
-package service
+package storage
 
 import (
 	"bytes"
@@ -38,12 +38,12 @@ func InitS3Client(endpoint string, region string, accessKeyId string, accessKeyS
 	return s3.NewFromConfig(cfg), nil
 }
 
-type FileStorage struct {
+type Client struct {
 	client *s3.Client
 }
 
-func NewFileStorage(endpoint string, region string, accessKeyId string, accessKeySecret string) (*FileStorage, error) {
-	s := new(FileStorage)
+func New(endpoint string, region string, accessKeyId string, accessKeySecret string) (*Client, error) {
+	s := new(Client)
 	client, err := InitS3Client(endpoint, region, accessKeyId, accessKeySecret)
 	if err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func NewFileStorage(endpoint string, region string, accessKeyId string, accessKe
 
 /*----------------------------------- Upload File To Bucket ----------------------------------- */
 
-func (s *FileStorage) Upload(ctx context.Context, bucketName string, fileName string, fileContent []byte) error {
+func (s *Client) Upload(ctx context.Context, bucketName string, fileName string, fileContent []byte) error {
 	contentType := http.DetectContentType(fileContent)
 	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      &bucketName,
@@ -66,7 +66,7 @@ func (s *FileStorage) Upload(ctx context.Context, bucketName string, fileName st
 
 /*----------------------------------- Get File From Bucket ----------------------------------- */
 
-func (s *FileStorage) Get(ctx context.Context, bucketName string, fileName string) ([]byte, error) {
+func (s *Client) Get(ctx context.Context, bucketName string, fileName string) ([]byte, error) {
 	obj, err := s.client.GetObject(ctx, &s3.GetObjectInput{Bucket: &bucketName, Key: &fileName})
 	if err != nil {
 		return nil, err
@@ -87,7 +87,7 @@ func (s *FileStorage) Get(ctx context.Context, bucketName string, fileName strin
 
 /*----------------------------------- Delete File From Bucket ----------------------------------- */
 
-func (s *FileStorage) Delete(ctx context.Context, bucketName string, fileName string) error {
+func (s *Client) Delete(ctx context.Context, bucketName string, fileName string) error {
 	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: &bucketName, Key: &fileName})
 	return err
 }
@@ -100,7 +100,7 @@ type FileMetaData struct {
 	SizeInBytes  uint64    `json:"size_in_bytes"`
 }
 
-func (s *FileStorage) GetList(ctx context.Context, bucketName string, subDir string) ([]FileMetaData, error) {
+func (s *Client) GetList(ctx context.Context, bucketName string, subDir string) ([]FileMetaData, error) {
 	var continuationToken *string
 	var fileList []FileMetaData
 	for {

@@ -11,8 +11,8 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/rohitxdev/go-api-template/internal/api"
 	"github.com/rohitxdev/go-api-template/pkg/config"
-	"github.com/rohitxdev/go-api-template/pkg/handler"
 	"github.com/rohitxdev/go-api-template/pkg/prettylog"
 	"github.com/rohitxdev/go-api-template/pkg/repo"
 	"github.com/rohitxdev/go-api-template/pkg/sqlite"
@@ -69,10 +69,10 @@ func main() {
 	}
 	r := repo.New(db)
 
-	//Create handler
-	h := handler.New(cfg, kv, r, &staticFS)
+	//Create API handler
+	h := api.New(cfg, kv, r, nil, nil, &staticFS)
 
-	e, err := handler.NewRouter(h)
+	e, err := api.NewRouter(h)
 	if err != nil {
 		panic("create router: " + err.Error())
 	}
