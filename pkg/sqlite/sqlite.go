@@ -1,4 +1,4 @@
-package kv
+package sqlite
 
 import (
 	"database/sql"
@@ -11,10 +11,9 @@ import (
 )
 
 var (
-	ErrIsNotDir    = errors.New("is not a directory")
-	ErrCreateDir   = errors.New("could not create directory")
-	ErrStatDir     = errors.New("could not stat directory")
-	ErrKeyNotFound = sql.ErrNoRows
+	ErrIsNotDir  = errors.New("is not a directory")
+	ErrCreateDir = errors.New("could not create directory")
+	ErrStatDir   = errors.New("could not stat directory")
 )
 
 func createDirIfNotExists(path string) error {
@@ -36,17 +35,17 @@ func createDirIfNotExists(path string) error {
 	return nil
 }
 
-func newSqliteDb(path string) (*sql.DB, error) {
+func NewDB(name string) (*sql.DB, error) {
 	dirName := "db"
 	if err := createDirIfNotExists(dirName); err != nil && err != ErrIsNotDir {
 		return nil, err
 	}
-	db, err := sql.Open("sqlite", dirName+"/"+path)
+	db, err := sql.Open("sqlite", fmt.Sprintf("%s/%s.db", dirName, name))
 	if err != nil {
 		return nil, err
 	}
 
-	stmts := []string{
+	stmts := [...]string{
 		"PRAGMA journal_mode = WAL;",
 		"PRAGMA synchronous = NORMAL;",
 		"PRAGMA locking_mode = NORMAL;",

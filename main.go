@@ -13,9 +13,9 @@ import (
 
 	"github.com/rohitxdev/go-api-template/pkg/config"
 	"github.com/rohitxdev/go-api-template/pkg/handler"
-	"github.com/rohitxdev/go-api-template/pkg/kv"
 	"github.com/rohitxdev/go-api-template/pkg/prettylog"
 	"github.com/rohitxdev/go-api-template/pkg/repo"
+	"github.com/rohitxdev/go-api-template/pkg/sqlite"
 )
 
 //go:embed templates public
@@ -63,7 +63,7 @@ func main() {
 	slog.Debug("connected to database ✔︎")
 
 	//Create kv store
-	kv, err := kv.New("kv")
+	kv, err := sqlite.NewKV("kv")
 	if err != nil {
 		panic("create kv store: " + err.Error())
 	}

@@ -1,4 +1,4 @@
-package kv
+package sqlite
 
 import (
 	"database/sql"
@@ -11,8 +11,8 @@ type KV struct {
 	name    string
 }
 
-func New(name string) (*KV, error) {
-	db, err := newSqliteDb(name + ".db")
+func NewKV(name string) (*KV, error) {
+	db, err := NewDB(name)
 	if err != nil {
 		return nil, err
 	}
@@ -41,13 +41,7 @@ func New(name string) (*KV, error) {
 func (kv *KV) Get(key string) (string, error) {
 	var value string
 	err := kv.getStmt.QueryRow(key).Scan(&value)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return "", ErrKeyNotFound
-		}
-		return "", err
-	}
-	return value, nil
+	return value, err
 }
 
 func (kv *KV) Set(key string, value string) error {
