@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/rohitxdev/go-api-template/pkg/config"
+	"github.com/rohitxdev/go-api-template/internal/config"
 	"github.com/rohitxdev/go-api-template/pkg/storage"
 )
 

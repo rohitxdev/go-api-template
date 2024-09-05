@@ -7,18 +7,15 @@ import (
 type prefix uint8
 
 const (
-	Event prefix = iota
-	Ticket
+	Request = iota
 	User
 	Session
-	Request
 )
 
 var prefixes = map[prefix]string{
 	Request: "req",
-	Event:   "evt",
-	Ticket:  "tkt",
 	User:    "usr",
+	Session: "ses",
 }
 
 func New(prefix prefix) string {

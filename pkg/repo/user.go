@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/lib/pq"
+	"github.com/rohitxdev/go-api-template/pkg/id"
 )
 
 var (
@@ -38,7 +39,7 @@ type User struct {
 
 func (repo *Repo) GetUserById(ctx context.Context, userId string) (*User, error) {
 	user := new(User)
-	err := repo.db.QueryRowContext(ctx, `SELECT id, role, email, password_hash, COALESCE(username, ''), COALESCE(full_name, ''), COALESCE(date_of_birth, '-infinity'), COALESCE(gender, ''), COALESCE(phone_number, ''), COALESCE(account_status, ''), COALESCE(image_url, ''), created_at, updated_at FROM users WHERE id=$1 LIMIT 1;`, userId).Scan(&user.Id, &user.Role, &user.Email, &user.PasswordHash, &user.Username, &user.FullName, &user.DateOfBirth, &user.Gender, &user.PhoneNumber, &user.AccountStatus, &user.ImageUrl, &user.CreatedAt, &user.UpdatedAt)
+	err := repo.stmts.GetUserById.QueryRowContext(ctx, userId).Scan(&user.Id, &user.Role, &user.Email, &user.PasswordHash, &user.Username, &user.FullName, &user.DateOfBirth, &user.Gender, &user.PhoneNumber, &user.AccountStatus, &user.ImageUrl, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -79,8 +80,8 @@ func (repo *Repo) GetUserByEmail(ctx context.Context, email string) (*User, erro
 }
 
 func (repo *Repo) CreateUser(ctx context.Context, user *UserCore) (string, error) {
-	var id string
-	err := repo.db.QueryRowContext(ctx, `INSERT INTO users(email, password_hash) VALUES($1, $2) RETURNING id;`, user.Email, user.PasswordHash).Scan(&id)
+	var userId string
+	err := repo.stmts.CreateUser.QueryRowContext(ctx, id.New(id.User), user.Email, user.PasswordHash).Scan(&userId)
 	if err != nil {
 		if err, ok := err.(*pq.Error); ok {
 			switch code := err.Code.Name(); code {
@@ -92,11 +93,11 @@ func (repo *Repo) CreateUser(ctx context.Context, user *UserCore) (string, error
 		}
 		return "", err
 	}
-	return id, err
+	return userId, err
 }
 
 func (repo *Repo) DeleteUserById(ctx context.Context, id string) error {
-	_, err := repo.db.ExecContext(ctx, `DELETE FROM users WHERE id=$1;`, id)
+	_, err := repo.stmts.DeleteUserById.ExecContext(ctx, id)
 	return err
 }
 

@@ -16,7 +16,7 @@ import (
 	"github.com/labstack/echo-contrib/pprof"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/rohitxdev/go-api-template/pkg/config"
+	"github.com/rohitxdev/go-api-template/internal/config"
 	"github.com/rohitxdev/go-api-template/pkg/id"
 	"github.com/rohitxdev/go-api-template/pkg/repo"
 	"golang.org/x/time/rate"
@@ -78,7 +78,7 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 	e.JSONSerializer = echoJSONSerializer{}
 
 	e.Renderer = echoTemplate{
-		templates: template.Must(template.ParseFS(h.staticFS, "templates/**/*.tmpl")),
+		templates: template.Must(template.ParseFS(h.staticFS, "web/templates/**/*.tmpl")),
 	}
 
 	e.Validator = echoValidator{
@@ -94,7 +94,7 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 	e.Pre(middleware.CSRF())
 
 	e.Pre(middleware.StaticWithConfig(middleware.StaticConfig{
-		Root:       "public",
+		Root:       "web",
 		Filesystem: http.FS(h.staticFS),
 	}))
 
@@ -212,6 +212,10 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 		v, _ := h.kv.Get("ping")
 		return c.String(http.StatusOK, v)
 	})
+
+	e.GET("/_", func(c echo.Context) error {
+		return c.String(http.StatusOK, "Hello, admin!")
+	}, h.Protected(RoleAdmin))
 
 	v1 := e.Group("/v1")
 	{

@@ -6,13 +6,21 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
-	"github.com/rohitxdev/go-api-template/pkg/config"
+	"github.com/rohitxdev/go-api-template/internal/config"
 	"github.com/rohitxdev/go-api-template/pkg/email"
 	"github.com/rohitxdev/go-api-template/pkg/repo"
 	"github.com/rohitxdev/go-api-template/pkg/sqlite"
 	"github.com/rohitxdev/go-api-template/pkg/storage"
 )
 
+type HandlerOpts struct {
+	Config   *config.Server
+	Kv       *sqlite.KV
+	Repo     *repo.Repo
+	Email    *email.Client
+	Fs       *storage.Client
+	StaticFS *embed.FS
+}
 type Handler struct {
 	config   *config.Server
 	kv       *sqlite.KV
@@ -22,14 +30,17 @@ type Handler struct {
 	staticFS *embed.FS
 }
 
-func New(c *config.Server, kv *sqlite.KV, r *repo.Repo, email *email.Client, fs *storage.Client, staticFS *embed.FS) *Handler {
+func New(opts *HandlerOpts) *Handler {
+	if opts == nil {
+		return nil
+	}
 	return &Handler{
-		config:   c,
-		kv:       kv,
-		repo:     r,
-		email:    email,
-		fs:       fs,
-		staticFS: staticFS,
+		config:   opts.Config,
+		kv:       opts.Kv,
+		repo:     opts.Repo,
+		email:    opts.Email,
+		fs:       opts.Fs,
+		staticFS: opts.StaticFS,
 	}
 }
 

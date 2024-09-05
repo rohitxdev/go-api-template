@@ -26,7 +26,7 @@ type AuthRequest struct {
 	Authorization string `header:"Authorization" validate:"required,startswith=Bearer "`
 }
 
-func (h *Handler) Auth(role role) echo.MiddlewareFunc {
+func (h *Handler) Protected(role role) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			req := new(AuthRequest)

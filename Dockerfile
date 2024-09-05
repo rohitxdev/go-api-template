@@ -23,7 +23,7 @@ COPY go.mod go.sum ./
 
 RUN go mod download
 
-CMD ["./tasks.sh","watch"]
+CMD ["./tasks","watch"]
 
 
 # Production builder image
@@ -39,7 +39,7 @@ RUN go mod download
 
 COPY . .
 
-RUN GOARCH=$TARGETARCH GOOS=$TARGETOS ./tasks.sh build
+RUN GOARCH=$TARGETARCH GOOS=$TARGETOS ./tasks build
 
 
 # Production image

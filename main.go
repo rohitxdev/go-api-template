@@ -12,13 +12,13 @@ import (
 	"os/signal"
 
 	"github.com/rohitxdev/go-api-template/internal/api"
-	"github.com/rohitxdev/go-api-template/pkg/config"
+	"github.com/rohitxdev/go-api-template/internal/config"
 	"github.com/rohitxdev/go-api-template/pkg/prettylog"
 	"github.com/rohitxdev/go-api-template/pkg/repo"
 	"github.com/rohitxdev/go-api-template/pkg/sqlite"
 )
 
-//go:embed templates public
+//go:embed web
 var staticFS embed.FS
 
 func main() {
@@ -70,7 +70,15 @@ func main() {
 	r := repo.New(db)
 
 	//Create API handler
-	h := api.New(cfg, kv, r, nil, nil, &staticFS)
+	opts := api.HandlerOpts{
+		Config:   cfg,
+		Kv:       kv,
+		Repo:     r,
+		Email:    nil,
+		Fs:       nil,
+		StaticFS: &staticFS,
+	}
+	h := api.New(&opts)
 
 	e, err := api.NewRouter(h)
 	if err != nil {
