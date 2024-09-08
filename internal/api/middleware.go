@@ -2,10 +2,9 @@ package api
 
 import (
 	"net/http"
-	"strings"
 
+	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
-	"github.com/rohitxdev/go-api-template/pkg/util"
 )
 
 type role uint8
@@ -22,24 +21,16 @@ var roleMap = map[string]role{
 	"admin": RoleAdmin,
 }
 
-type AuthRequest struct {
-	Authorization string `header:"Authorization" validate:"required,startswith=Bearer "`
-}
-
 func (h *Handler) Protected(role role) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			req := new(AuthRequest)
-			if err := bindAndValidate(c, req); err != nil {
-				return err
-			}
-			accessToken := strings.Split(req.Authorization, " ")[1]
-			if accessToken == "" {
-				return c.String(http.StatusUnauthorized, "invalid bearer token")
-			}
-			userId, err := util.VerifyJWT(accessToken, h.config.JwtSecret)
+			sess, err := session.Get("session", c)
 			if err != nil {
 				return c.String(http.StatusUnauthorized, err.Error())
+			}
+			userId, ok := sess.Values["user_id"].(string)
+			if !ok {
+				return c.String(http.StatusUnauthorized, "invalid session")
 			}
 			user, err := h.repo.GetUserById(c.Request().Context(), userId)
 			if err != nil {

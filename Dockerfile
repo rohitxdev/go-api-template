@@ -13,15 +13,9 @@ FROM --platform=$BUILDPLATFORM golang:$GO_VERSION AS development
 
 WORKDIR /app
 
-RUN curl https://sh.rustup.rs | sh -s -- -y
+COPY go.mod go.sum tasks ./
 
-RUN export PATH="$HOME/.cargo/bin:$PATH" && cargo install watchexec-cli
-
-RUN cp $HOME/.cargo/bin/watchexec /usr/local/bin/
-
-COPY go.mod go.sum ./
-
-RUN go mod download
+RUN  ./tasks init
 
 CMD ["./tasks","watch"]
 

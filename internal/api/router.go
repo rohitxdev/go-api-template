@@ -1,27 +1,31 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
-	"html/template"
 	"io"
 	"log/slog"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/go-playground/validator"
+	"github.com/gorilla/sessions"
 	"github.com/labstack/echo-contrib/pprof"
+	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/rohitxdev/go-api-template/docs"
 	"github.com/rohitxdev/go-api-template/internal/config"
 	"github.com/rohitxdev/go-api-template/pkg/id"
 	"github.com/rohitxdev/go-api-template/pkg/repo"
+	echoSwagger "github.com/swaggo/echo-swagger"
 	"golang.org/x/time/rate"
 
-	"github.com/goccy/go-json"
+	_ "github.com/rohitxdev/go-api-template/docs"
 )
 
 // Custom view renderer
@@ -69,7 +73,13 @@ func (s echoJSONSerializer) Deserialize(c echo.Context, i interface{}) error {
 	return err
 }
 
+// @title Starter code API
+// @version 1.0
+// @description This is a starter code API.
+
 func NewRouter(h *Handler) (*echo.Echo, error) {
+	docs.SwaggerInfo.Host = h.config.Host + ":" + h.config.Port
+
 	e := echo.New()
 
 	e.HideBanner = true
@@ -91,7 +101,9 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 		echo.TrustPrivateNet(false), // e.g. ipv4 start with 10. or 192.168
 	)
 
-	e.Pre(middleware.CSRF())
+	if !h.config.IsDev {
+		e.Pre(middleware.CSRF())
+	}
 
 	e.Pre(middleware.StaticWithConfig(middleware.StaticConfig{
 		Root:       "web",
@@ -123,6 +135,8 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 				ExpiresIn: time.Minute,
 			})}))
 	}
+
+	e.Use(session.Middleware(sessions.NewCookieStore([]byte(h.config.SessionSecret))))
 
 	// Gzip compression & decompression
 
@@ -204,28 +218,59 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 		"host":  host,
 	}
 
+	//Routes
+
+	e.GET("/swagger/*", echoSwagger.EchoWrapHandler(func(c *echoSwagger.Config) { c.SyntaxHighlight = true }))
+
 	e.GET("/", func(c echo.Context) error {
 		return c.Render(http.StatusOK, "home.tmpl", data)
 	})
 
-	e.GET("/ping", func(c echo.Context) error {
-		v, _ := h.kv.Get("ping")
-		return c.String(http.StatusOK, v)
-	})
+	e.GET("/ping", h.Ping)
 
-	e.GET("/_", func(c echo.Context) error {
-		return c.String(http.StatusOK, "Hello, admin!")
-	}, h.Protected(RoleAdmin))
+	e.GET("/_", h.AdminRoute, h.Protected(RoleAdmin))
+
+	e.GET("/config", h.GetConfig)
 
 	v1 := e.Group("/v1")
 	{
-		v1.GET("/config", func(c echo.Context) error {
-			clientConfig := config.Client{
-				Env: h.config.Env,
-			}
-			return c.JSON(http.StatusOK, clientConfig)
-		})
+		auth := v1.Group("/auth")
+		{
+			auth.POST("/sign-up", h.SignUp)
+			auth.POST("/log-in", h.LogIn)
+			auth.POST("/log-out", h.LogOut)
+			auth.POST("/change-password", h.ChangePassword)
+		}
 	}
 
 	return e, nil
+}
+
+// @Summary Ping
+// @Description Ping the server.
+// @Router /ping [get]
+// @Success 200 {string} string "pong"
+func (h *Handler) Ping(c echo.Context) error {
+	return c.String(http.StatusOK, "pong")
+}
+
+// @Summary Admin route
+// @Description Admin route.
+// @Security ApiKeyAuth
+// @Router /_ [get]
+// @Success 200 {string} string "Hello, Admin!"
+// @Failure 401 {string} string "invalid session"
+func (h *Handler) AdminRoute(c echo.Context) error {
+	return c.String(http.StatusOK, "Hello, Admin!")
+}
+
+// @Summary Get config
+// @Description Get client config.
+// @Router /config [get]
+// @Success 200 {object} config.Client
+func (h *Handler) GetConfig(c echo.Context) error {
+	clientConfig := config.Client{
+		Env: h.config.Env,
+	}
+	return c.JSON(http.StatusOK, clientConfig)
 }

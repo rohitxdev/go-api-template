@@ -22,7 +22,7 @@ type Server struct {
 	BuildInfo             string `validate:"required"`
 	Host                  string `validate:"required,ip"`
 	Port                  string `validate:"required,gte=0"`
-	JwtSecret             string `validate:"required"`
+	SessionSecret         string `validate:"required"`
 	Env                   string `validate:"required,oneof=development production"`
 	DatabaseUrl           string `validate:"required"`
 	SmtpHost              string `validate:"required"`
@@ -84,7 +84,7 @@ func Load(envFilePath string) (*Server, error) {
 		Env:                   env,
 		Host:                  os.Getenv("HOST"),
 		Port:                  os.Getenv("PORT"),
-		JwtSecret:             os.Getenv("JWT_SECRET"),
+		SessionSecret:         os.Getenv("SESSION_SECRET"),
 		DatabaseUrl:           os.Getenv("DATABASE_URL"),
 		SmtpHost:              os.Getenv("SMTP_HOST"),
 		SmtpUsername:          os.Getenv("SMTP_USERNAME"),

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/rohitxdev/go-api-template/pkg/assert"
 	"github.com/rohitxdev/go-api-template/pkg/sqlite"
@@ -26,7 +27,7 @@ func TestKV(t *testing.T) {
 	var kv *sqlite.KV
 	var err error
 	t.Run("Create KV store", func(t *testing.T) {
-		kv, err = sqlite.NewKV("test_kv")
+		kv, err = sqlite.NewKV("test_kv", time.Minute*5)
 		assert.Nil(t, err)
 	})
 

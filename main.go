@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/rohitxdev/go-api-template/internal/api"
 	"github.com/rohitxdev/go-api-template/internal/config"
@@ -60,16 +61,27 @@ func main() {
 		slog.Debug("database connection closed ✔︎")
 	}()
 
+	if err = db.Ping(); err != nil {
+		panic("ping database: " + err.Error())
+	}
+
 	slog.Debug("connected to database ✔︎")
 
-	//Create kv store
-	kv, err := sqlite.NewKV("kv")
+	//Connect to kv store
+	kv, err := sqlite.NewKV("kv", time.Minute*5)
 	if err != nil {
-		panic("create kv store: " + err.Error())
+		panic("connect to kv store: " + err.Error())
 	}
-	r := repo.New(db)
+	defer func() {
+		kv.Close()
+		slog.Debug("kv store closed ✔︎")
+	}()
+	slog.Debug("connected to kv store ✔︎")
 
 	//Create API handler
+	r := repo.New(db)
+	defer r.Close()
+
 	opts := api.HandlerOpts{
 		Config:   cfg,
 		Kv:       kv,
@@ -85,7 +97,7 @@ func main() {
 		panic("create router: " + err.Error())
 	}
 
-	//Create tcp listener
+	//Create tcp listener & start server
 	ls, err := net.Listen("tcp", cfg.Host+":"+cfg.Port)
 	if err != nil {
 		panic("tcp listen: " + err.Error())
@@ -98,14 +110,14 @@ func main() {
 	}()
 	slog.Debug("tcp listener created ✔︎")
 
-	slog.Debug("http server started ✔︎")
-	slog.Info("server is listening to \x1b[32mhttp://" + ls.Addr().String() + "\x1b[0m")
-
 	go func() {
 		if err := http.Serve(ls, e); err != nil && !errors.Is(err, net.ErrClosed) {
 			panic("serve http: " + err.Error())
 		}
 	}()
+
+	slog.Debug("http server started ✔︎")
+	slog.Info("server is listening to \x1b[32mhttp://" + ls.Addr().String() + "\x1b[0m and is ready to serve requests ✔︎")
 
 	//Shut down http server gracefully
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)

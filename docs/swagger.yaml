@@ -1,0 +1,51 @@
+definitions:
+  config.Client:
+    properties:
+      env:
+        enum:
+        - development
+        - production
+        type: string
+    required:
+    - env
+    type: object
+info:
+  contact: {}
+  description: This is a starter code API.
+  title: Starter code API
+  version: "1.0"
+paths:
+  /_:
+    get:
+      description: Admin route.
+      responses:
+        "200":
+          description: Hello, Admin!
+          schema:
+            type: string
+        "401":
+          description: invalid session
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Admin route
+  /config:
+    get:
+      description: Get client config.
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/config.Client'
+      summary: Get config
+  /ping:
+    get:
+      description: Ping the server.
+      responses:
+        "200":
+          description: pong
+          schema:
+            type: string
+      summary: Ping
+swagger: "2.0"

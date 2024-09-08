@@ -1,11 +1,13 @@
-package util
+package cryptoutil
 
 import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/golang-jwt/jwt"
@@ -90,4 +92,20 @@ func GenerateAccessAndRefreshTokens(userId string, accessTokenExpiry time.Durati
 	accessToken, _ := GenerateJWT(userId, accessTokenExpiry, secret)
 	refreshToken, _ := GenerateJWT(userId, refreshTokenExpiry, secret)
 	return accessToken, refreshToken
+}
+
+func RandomString() string {
+	var buf = make([]byte, 64)
+	_, _ = rand.Read(buf)
+
+	var i big.Int
+	return i.SetBytes(buf).Text(62)
+}
+
+func Base62Hash(text string) string {
+	hasher := sha256.New()
+	buf := hasher.Sum([]byte(text))
+
+	var i big.Int
+	return i.SetBytes(buf).Text(62)
 }

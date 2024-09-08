@@ -2,13 +2,13 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
-	"net/url"
-	"time"
 
+	"github.com/gorilla/sessions"
+	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/rohitxdev/go-api-template/pkg/repo"
-	"github.com/rohitxdev/go-api-template/pkg/util"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -16,26 +16,36 @@ var (
 	ErrUserNotLoggedIn = errors.New("user is not logged in")
 )
 
-func (h *Handler) GetAccessToken(c echo.Context) error {
-	refreshToken, err := c.Cookie("refresh_token")
+func createSession(c echo.Context, userId string) (*sessions.Session, error) {
+	sess, err := session.Get("session", c)
 	if err != nil {
-		return c.String(http.StatusUnauthorized, ErrUserNotLoggedIn.Error())
+		return nil, err
 	}
-	userId, err := util.VerifyJWT(refreshToken.Value, h.config.JwtSecret)
-	if err != nil {
-		c.SetCookie(createLogOutCookie())
-		return c.String(http.StatusUnauthorized, err.Error())
+	sess.Options = &sessions.Options{
+		Path:     "/",
+		MaxAge:   86400 * 7,
+		HttpOnly: true,
 	}
-	accessToken, _ := util.GenerateJWT(userId, h.config.AccessTokenExpiresIn, h.config.JwtSecret)
-	return c.JSON(http.StatusOK, echo.Map{"access_token": accessToken})
+	sess.Values["user_id"] = userId
+	if err := sess.Save(c.Request(), c.Response()); err != nil {
+		return nil, err
+	}
+	return sess, nil
 }
 
 func (h *Handler) LogOut(c echo.Context) error {
-	_, err := c.Cookie("refresh_token")
+	sess, err := session.Get("session", c)
 	if err != nil {
 		return c.String(http.StatusBadRequest, ErrUserNotLoggedIn.Error())
 	}
-	c.SetCookie(createLogOutCookie())
+	sess.Options = &sessions.Options{
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+	}
+	if err := sess.Save(c.Request(), c.Response()); err != nil {
+		return err
+	}
 	return c.String(http.StatusOK, "Logged out")
 }
 
@@ -53,26 +63,22 @@ func (h *Handler) LogIn(c echo.Context) error {
 	if err := bindAndValidate(c, req); err != nil {
 		return err
 	}
-	user, err := h.repo.GetUserByEmail(c.Request().Context(), util.SanitizeEmail(req.Email))
+	user, err := h.repo.GetUserByEmail(c.Request().Context(), SanitizeEmail(req.Email))
 	if err != nil {
 		return err
 	}
 	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		return c.String(http.StatusUnauthorized, err.Error())
 	}
-	accessToken, refreshToken := util.GenerateAccessAndRefreshTokens(user.Id, h.config.AccessTokenExpiresIn, h.config.RefreshTokenExpiresIn, h.config.JwtSecret)
-	c.SetCookie(createLogInCookie(refreshToken, h.config.RefreshTokenExpiresIn))
-	return c.JSON(http.StatusOK, LogInResponse{AccessToken: accessToken})
+	if _, err := createSession(c, user.Id); err != nil {
+		return err
+	}
+	return c.String(http.StatusOK, "Logged in successfully")
 }
 
 type SignUpRequest struct {
-	Email           string `json:"email" validate:"required,email"`
-	Password        string `json:"password" validate:"required,min=8,max=512"`
-	ConfirmPassword string `json:"confirm_password" validate:"required,eqcsfield=Password"`
-}
-
-type SignUpResponse struct {
-	AccessToken string `json:"access_token"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=8,max=64"`
 }
 
 func (h *Handler) SignUp(c echo.Context) error {
@@ -85,73 +91,50 @@ func (h *Handler) SignUp(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	user.Email = util.SanitizeEmail(req.Email)
+	user.Email = SanitizeEmail(req.Email)
 	user.PasswordHash = string(passwordHash)
 	userId, err := h.repo.CreateUser(c.Request().Context(), user)
 	if err != nil {
+		fmt.Println(err)
 		return c.String(http.StatusBadRequest, err.Error())
 	}
-	accessToken, refreshToken := util.GenerateAccessAndRefreshTokens(userId, h.config.AccessTokenExpiresIn, h.config.RefreshTokenExpiresIn, h.config.JwtSecret)
-	c.SetCookie(createLogInCookie(refreshToken, h.config.RefreshTokenExpiresIn))
-	return c.JSON(http.StatusCreated, SignUpResponse{AccessToken: accessToken})
-}
-
-func (h *Handler) SendPasswordChangeEmail(c echo.Context) error {
-	user, ok := c.Get("user").(*repo.User)
-	if !ok {
-		return c.String(http.StatusUnauthorized, ErrUserNotLoggedIn.Error())
+	if _, err := createSession(c, userId); err != nil {
+		return err
 	}
-	token, _ := util.GenerateJWT(user.Id, time.Minute*10, h.config.JwtSecret)
-	u, _ := url.Parse("/v1/auth/change-password")
-	q := u.Query()
-	q.Set("token", token)
-	u.RawQuery = q.Encode()
-	return c.Redirect(http.StatusTemporaryRedirect, u.String())
+	return c.String(http.StatusCreated, "Signed up successfully")
 }
 
-type ForgotPasswordRequest struct {
-	Email string `json:"email" validate:"required,email"`
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"currentPassword" validate:"required,min=8,max=64"`
+	NewPassword     string `json:"newPassword" validate:"required,min=8,max=64"`
 }
 
-type ResetPasswordRequest struct {
-	Token       string `form:"token" query:"token" validate:"required"`
-	NewPassword string `form:"new_password" validate:"required,min=8,max=512"`
-}
-
-func (h *Handler) ResetPassword(c echo.Context) error {
-	req := new(ResetPasswordRequest)
+func (h *Handler) ChangePassword(c echo.Context) error {
+	req := new(ChangePasswordRequest)
 	if err := bindAndValidate(c, req); err != nil {
 		return err
 	}
-	userId, err := util.VerifyJWT(req.Token, h.config.JwtSecret)
+	sess, err := session.Get("session", c)
 	if err != nil {
-		return c.String(http.StatusBadRequest, err.Error())
+		return c.String(http.StatusUnauthorized, ErrUserNotLoggedIn.Error())
 	}
-	_, err = h.repo.GetUserById(c.Request().Context(), userId)
-	if errors.Is(err, repo.ErrUserNotFound) {
-		return c.String(http.StatusNotFound, repo.ErrUserNotFound.Error())
-	}
-	if c.Request().Method == "GET" {
-		return c.Render(http.StatusOK, "change-password.tmpl", nil)
-	} else {
-		hash, _ := bcrypt.GenerateFromPassword([]byte(req.NewPassword), 12)
-		err := h.repo.Update(c.Request().Context(), userId, map[string]any{
-			"password_hash": string(hash),
-		})
-		if err != nil {
-			return c.String(http.StatusInternalServerError, err.Error())
-		}
-		return c.String(http.StatusOK, "reset password successfully")
-	}
-}
-
-func (h *Handler) DeleteAccount(c echo.Context) error {
-	user, ok := c.Get("user").(*repo.User)
+	userId, ok := sess.Values["user_id"].(string)
 	if !ok {
 		return c.String(http.StatusUnauthorized, ErrUserNotLoggedIn.Error())
 	}
-	if err := h.repo.DeleteUserById(c.Request().Context(), user.Id); err != nil {
+	user, err := h.repo.GetUserById(c.Request().Context(), userId)
+	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
-	return c.String(http.StatusOK, "deleted account successfully")
+	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.CurrentPassword)); err != nil {
+		return c.String(http.StatusUnauthorized, err.Error())
+	}
+	hash, _ := bcrypt.GenerateFromPassword([]byte(req.NewPassword), 12)
+	err = h.repo.Update(c.Request().Context(), userId, map[string]any{
+		"password_hash": string(hash),
+	})
+	if err != nil {
+		return c.String(http.StatusInternalServerError, err.Error())
+	}
+	return c.String(http.StatusOK, "Password changed successfully")
 }

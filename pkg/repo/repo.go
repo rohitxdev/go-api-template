@@ -9,6 +9,32 @@ type Repo struct {
 	stmts *Stmts
 }
 
+func (s *Stmts) Close() error {
+	if err := s.CreateUserTable.Close(); err != nil {
+		return err
+	}
+	if err := s.GetUserById.Close(); err != nil {
+		return err
+	}
+	if err := s.GetUserByEmail.Close(); err != nil {
+		return err
+	}
+	if err := s.CreateUser.Close(); err != nil {
+		return err
+	}
+	if err := s.DeleteUserById.Close(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (repo *Repo) Close() error {
+	if err := repo.stmts.Close(); err != nil {
+		return err
+	}
+	return repo.db.Close()
+}
+
 func New(db *sql.DB) *Repo {
 	stmts, err := prepareStmts(db)
 	if err != nil {
@@ -72,7 +98,7 @@ func prepareStmts(db *sql.DB) (*Stmts, error) {
 	}
 	stmts.GetUserByEmail = getUserByEmail
 
-	createUser, err := db.Prepare(`INSERT INTO users(email, password_hash) VALUES($1, $2) RETURNING id;`)
+	createUser, err := db.Prepare(`INSERT INTO users(id, email, password_hash) VALUES($1, $2, $3);`)
 	if err != nil {
 		return nil, err
 	}

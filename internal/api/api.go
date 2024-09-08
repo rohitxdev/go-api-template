@@ -3,7 +3,7 @@ package api
 import (
 	"embed"
 	"net/http"
-	"time"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/rohitxdev/go-api-template/internal/config"
@@ -63,27 +63,14 @@ func bindAndValidate(c echo.Context, i any) error {
 	return err
 }
 
-var logOutCookie = &http.Cookie{
-	Name:     "refresh-token",
-	Secure:   true,
-	HttpOnly: true,
-	SameSite: http.SameSiteStrictMode,
-	Path:     "/v1/auth/refresh-token",
-	MaxAge:   0,
-}
-
-func createLogOutCookie() *http.Cookie {
-	return logOutCookie
-}
-
-func createLogInCookie(refreshToken string, expiresIn time.Duration) *http.Cookie {
-	return &http.Cookie{
-		Name:     "refresh_token",
-		Value:    refreshToken,
-		Secure:   true,
-		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
-		Path:     "/v1/auth/refresh-token",
-		MaxAge:   int(expiresIn / time.Second),
+func SanitizeEmail(email string) string {
+	emailParts := strings.Split(email, "@")
+	username := emailParts[0]
+	domain := emailParts[1]
+	if strings.Contains(username, "+") {
+		username = strings.Split(username, "+")[0]
 	}
+	username = strings.ReplaceAll(username, "-", "")
+	username = strings.ReplaceAll(username, ".", "")
+	return username + "@" + domain
 }

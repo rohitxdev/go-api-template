@@ -2,13 +2,13 @@
 
 set -o allexport
 
-ENV_FILE="${ENV_FILE:-.env}"
+ENV_FILE="${ENV_FILE:-".env"}"
 
 if [[ -r $ENV_FILE ]]; then
     # shellcheck disable=SC1090
     source "$ENV_FILE"
 else
-    printf "\033[93m%s\033[0m\n" "Warning: Cannot read from \"$ENV_FILE\". Make sure the file path is correct & has required permissions." >&2
+    printf "\x1b[93m%s\x1b[0m\n" "Warning: Cannot read from \"$ENV_FILE\". Make sure the file path is correct & has required permissions." >&2
 fi
 
 GO_VERSION=$(go list -m -f "{{.GoVersion}}")
@@ -21,67 +21,70 @@ set +o allexport
 
 set -e
 
-build_debug_args=(--ldflags="-X $PACKAGE_NAME/internal/config.BuildInfo=$APP_NAME::$APP_VERSION::debug" --race)
-build_release_args=(--ldflags="-s -w -X $PACKAGE_NAME/internal/config.BuildInfo=$APP_NAME::$APP_VERSION::release -extldflags=-static" --trimpath --buildmode=pie)
+build_name_prefix="$APP_NAME.$APP_VERSION"
+build_debug_args=(--ldflags="-X $PACKAGE_NAME/internal/config.BuildInfo=$build_name_prefix.debug" --race)
+build_release_args=(--ldflags="-s -w -X $PACKAGE_NAME/internal/config.BuildInfo=$build_name_prefix.release -extldflags=-static" --trimpath --buildmode=pie)
 
-task=$1
-
-while true; do
-    case $task in
-    "docker-watch")
-        compose_file="docker-compose.yml"
-        docker compose -f "$compose_file" down --remove-orphans
-        docker compose -f "$compose_file" up --build
-        break
-        ;;
-    "docker-build")
-        docker build --tag="$APP_NAME":"$APP_VERSION" --target="prod" --build-arg="GO_VERSION=$GO_VERSION" .
-        break
-        ;;
-    "docker-push")
-        docker login
-        docker tag "$APP_NAME":"$APP_VERSION" "$DOCKERHUB_REPO_NAME":"$APP_VERSION"
-        docker push "$DOCKERHUB_REPO_NAME":"$APP_VERSION"
-        break
-        ;;
-    "watch")
-        watchexec --stop-timeout="${SHUTDOWN_TIMEOUT:-10s}" --stop-signal=SIGINT --shell=none --restart ./tasks run
-        break
-        ;;
-    "run")
-        CGO_ENABLED=0 go run "${build_debug_args[@]}" .
-        break
-        ;;
-    "start")
-        if [[ -x "./bin/build" ]]; then
-            ./bin/"build"
-        else
-            echo "Build not found. Building..." && sleep 1 && ./tasks build && ./bin/build
-        fi
-        break
-        ;;
-    "build")
-        echo "building app..." && CGO_ENABLED=0 go build "${build_release_args[@]}" -o ./bin/build ./main.go && echo "built app successfully ✔"
-        break
-        ;;
-    "test")
-        go test --race --count=2 -v ./...
-        break
-        ;;
-    "test-cover")
-        go test --race --coverprofile=./tmp/coverage.out ./... && go tool cover --html=./tmp/coverage.out
-        break
-        ;;
-    "bench")
-        go test --race --count=2 -v -benchmem --bench=. ./...
-        break
-        ;;
-    "checkpoint")
-        git add . && git commit -m "Checkpoint at $(date "+%Y-%m-%dT%H:%M:%S%z")" && git push && echo "Checkpoint created and pushed to remote ✔"
-        break
-        ;;
-    *)
-        menu="
+case $1 in
+"docker-watch")
+    compose_file="docker-compose.yml"
+    docker compose -f "$compose_file" down --remove-orphans
+    docker compose -f "$compose_file" up --build
+    ;;
+"docker-build")
+    docker build --tag="$APP_NAME":"$APP_VERSION" --target="prod" --build-arg="GO_VERSION=$GO_VERSION" .
+    ;;
+"docker-push")
+    docker login
+    docker tag "$APP_NAME":"$APP_VERSION" "$DOCKERHUB_REPO_NAME":"$APP_VERSION"
+    docker push "$DOCKERHUB_REPO_NAME":"$APP_VERSION"
+    ;;
+"watch")
+    # build.kill_delay is in nanoseconds
+    air --tmp_dir="bin/tmp" --build.bin="\"$0\" run" --build.delay="0" --build.kill_delay="10000000000" \
+        --build.include_ext="go,tmpl,env" --build.send_interrupt="true" --log.main_only="true" --misc.clean_on_exit="true"
+    ;;
+"run")
+    go run "${build_debug_args[@]}" .
+    ;;
+"start")
+    if [[ ! -x "./bin/build" ]]; then
+        echo "Build not found. Building..."
+        sleep 1
+        $0 build
+    fi
+    ./bin/build
+    ;;
+"build")
+    swag init -g internal/api/router.go
+    echo "building app..." && CGO_ENABLED=0 go build --pgo default.pgo "${build_release_args[@]}" -o ./bin/build ./main.go && echo "built app successfully ✔"
+    ;;
+"test")
+    go test --race --count=2 -v ./...
+    ;;
+"test-cover")
+    go test --race --coverprofile=./tmp/coverage.out ./... && go tool cover --html=./tmp/coverage.out
+    ;;
+"bench")
+    go test --race --count=2 -v --benchmem --bench=. ./...
+    ;;
+"clean")
+    go mod tidy
+    go clean --cache
+    ;;
+"init")
+    go install github.com/air-verse/air@latest
+    go install github.com/swaggo/swag/cmd/swag@latest
+    go mod download
+    ;;
+"pprof")
+    curl "http://localhost:${PORT:-"8000"}/debug/pprof/profile?seconds=30" >default.pgo
+    ;;
+"checkpoint")
+    git add . && git commit -m "Checkpoint at $(date "+%Y-%m-%dT%H:%M:%S%z")" && git push && echo "Checkpoint created and pushed to remote ✔"
+    ;;
+*)
+    menu="
  1) docker-watch    -  Run development server in docker
  2) docker-build    -  Build docker image
  3) docker-push     -  Push docker image to dockerhub
@@ -92,9 +95,11 @@ while true; do
  8) test            -  Run tests
  9) test-cover      -  Run tests and show coverage
 10) bench           -  Run benchmarks
-11) checkpoint      -  Create a git checkpoint and push to remote"
-        printf "\033[95m%s\033[0m%s\n%s\n" "Available tasks" "$menu" "Usage: $0 <task>"
-        break
-        ;;
-    esac
-done
+11) clean           -  Clean go mod & cache
+12) init            -  Install dependencies
+13) pprof           -  Generate pprof profile
+14) checkpoint      -  Create a git checkpoint and push to remote
+"
+    printf "\x1b[95m %s\x1b[0m%s\n%s\n" "Available tasks" "$menu" "Usage: $0 <task>"
+    ;;
+esac

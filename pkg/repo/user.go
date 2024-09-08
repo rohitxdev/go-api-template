@@ -80,20 +80,12 @@ func (repo *Repo) GetUserByEmail(ctx context.Context, email string) (*User, erro
 }
 
 func (repo *Repo) CreateUser(ctx context.Context, user *UserCore) (string, error) {
-	var userId string
-	err := repo.stmts.CreateUser.QueryRowContext(ctx, id.New(id.User), user.Email, user.PasswordHash).Scan(&userId)
+	userId := id.New(id.User)
+	err := repo.db.QueryRowContext(ctx, `INSERT INTO users(id, email, password_hash) VALUES($1, $2, $3) RETURNING id;`, userId, user.Email, user.PasswordHash).Scan(&userId)
 	if err != nil {
-		if err, ok := err.(*pq.Error); ok {
-			switch code := err.Code.Name(); code {
-			case "unique_violation":
-				return "", ErrUserAlreadyExists
-			default:
-				return "", errors.New(code)
-			}
-		}
 		return "", err
 	}
-	return userId, err
+	return userId, nil
 }
 
 func (repo *Repo) DeleteUserById(ctx context.Context, id string) error {
