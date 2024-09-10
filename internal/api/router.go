@@ -212,23 +212,22 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 		},
 	}))
 
-	data := map[string]string{
-		"build": h.config.BuildInfo,
-		"env":   h.config.Env,
-		"host":  host,
-	}
-
 	//Routes
 
 	e.GET("/swagger/*", echoSwagger.EchoWrapHandler(func(c *echoSwagger.Config) { c.SyntaxHighlight = true }))
 
 	e.GET("/", func(c echo.Context) error {
+		data := echo.Map{
+			"build": h.config.BuildInfo,
+			"env":   h.config.Env,
+			"host":  host,
+		}
 		return c.Render(http.StatusOK, "home.tmpl", data)
 	})
 
 	e.GET("/ping", h.Ping)
 
-	e.GET("/_", h.AdminRoute, h.Protected(RoleAdmin))
+	e.GET("/_", h.AdminRoute, h.protected(RoleAdmin))
 
 	e.GET("/config", h.GetConfig)
 
