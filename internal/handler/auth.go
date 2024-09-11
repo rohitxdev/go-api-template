@@ -1,4 +1,4 @@
-package api
+package handler
 
 import (
 	"errors"
@@ -33,7 +33,7 @@ func createSession(c echo.Context, userId string) (*sessions.Session, error) {
 	return sess, nil
 }
 
-func (h *Handler) LogOut(c echo.Context) error {
+func (h *handler) LogOut(c echo.Context) error {
 	sess, err := session.Get("session", c)
 	if err != nil {
 		return c.String(http.StatusBadRequest, ErrUserNotLoggedIn.Error())
@@ -49,17 +49,13 @@ func (h *Handler) LogOut(c echo.Context) error {
 	return c.String(http.StatusOK, "Logged out")
 }
 
-type LogInRequest struct {
+type logInRequest struct {
 	Email    string `form:"email" json:"email" validate:"required,email"`
 	Password string `form:"password" json:"password" validate:"required"`
 }
 
-type LogInResponse struct {
-	AccessToken string `json:"access_token"`
-}
-
-func (h *Handler) LogIn(c echo.Context) error {
-	req := new(LogInRequest)
+func (h *handler) LogIn(c echo.Context) error {
+	req := new(logInRequest)
 	if err := bindAndValidate(c, req); err != nil {
 		return err
 	}
@@ -76,13 +72,13 @@ func (h *Handler) LogIn(c echo.Context) error {
 	return c.String(http.StatusOK, "Logged in successfully")
 }
 
-type SignUpRequest struct {
+type signUpRequest struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,min=8,max=64"`
 }
 
-func (h *Handler) SignUp(c echo.Context) error {
-	req := new(SignUpRequest)
+func (h *handler) SignUp(c echo.Context) error {
+	req := new(signUpRequest)
 	if err := bindAndValidate(c, req); err != nil {
 		return err
 	}
@@ -104,13 +100,13 @@ func (h *Handler) SignUp(c echo.Context) error {
 	return c.String(http.StatusCreated, "Signed up successfully")
 }
 
-type ChangePasswordRequest struct {
+type changePasswordRequest struct {
 	CurrentPassword string `json:"currentPassword" validate:"required,min=8,max=64"`
 	NewPassword     string `json:"newPassword" validate:"required,min=8,max=64"`
 }
 
-func (h *Handler) ChangePassword(c echo.Context) error {
-	req := new(ChangePasswordRequest)
+func (h *handler) ChangePassword(c echo.Context) error {
+	req := new(changePasswordRequest)
 	if err := bindAndValidate(c, req); err != nil {
 		return err
 	}

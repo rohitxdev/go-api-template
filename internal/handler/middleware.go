@@ -1,4 +1,4 @@
-package api
+package handler
 
 import (
 	"net/http"
@@ -21,7 +21,7 @@ var roleMap = map[string]role{
 	"admin": RoleAdmin,
 }
 
-func (h *Handler) protected(role role) echo.MiddlewareFunc {
+func (h *handler) protected(role role) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			sess, err := session.Get("session", c)

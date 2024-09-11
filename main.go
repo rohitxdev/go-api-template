@@ -12,8 +12,8 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/rohitxdev/go-api-template/internal/api"
 	"github.com/rohitxdev/go-api-template/internal/config"
+	"github.com/rohitxdev/go-api-template/internal/handler"
 	"github.com/rohitxdev/go-api-template/pkg/prettylog"
 	"github.com/rohitxdev/go-api-template/pkg/repo"
 	"github.com/rohitxdev/go-api-template/pkg/sqlite"
@@ -82,7 +82,7 @@ func main() {
 	r := repo.New(db)
 	defer r.Close()
 
-	opts := api.HandlerOpts{
+	opts := handler.Opts{
 		Config:   cfg,
 		Kv:       kv,
 		Repo:     r,
@@ -90,9 +90,8 @@ func main() {
 		Fs:       nil,
 		StaticFS: &staticFS,
 	}
-	h := api.New(&opts)
 
-	e, err := api.NewRouter(h)
+	e, err := handler.New(&opts)
 	if err != nil {
 		panic("create router: " + err.Error())
 	}

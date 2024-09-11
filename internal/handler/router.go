@@ -1,4 +1,4 @@
-package api
+package handler
 
 import (
 	"encoding/json"
@@ -77,7 +77,20 @@ func (s echoJSONSerializer) Deserialize(c echo.Context, i interface{}) error {
 // @version 1.0
 // @description This is a starter code API.
 
-func NewRouter(h *Handler) (*echo.Echo, error) {
+func New(opts *Opts) (*echo.Echo, error) {
+	if opts == nil {
+		return nil, errors.New("opts is nil")
+	}
+
+	h := &handler{
+		config:   opts.Config,
+		kv:       opts.Kv,
+		repo:     opts.Repo,
+		email:    opts.Email,
+		fs:       opts.Fs,
+		staticFS: opts.StaticFS,
+	}
+
 	docs.SwaggerInfo.Host = h.config.Host + ":" + h.config.Port
 
 	e := echo.New()
@@ -249,7 +262,7 @@ func NewRouter(h *Handler) (*echo.Echo, error) {
 // @Description Ping the server.
 // @Router /ping [get]
 // @Success 200 {string} string "pong"
-func (h *Handler) Ping(c echo.Context) error {
+func (h *handler) Ping(c echo.Context) error {
 	return c.String(http.StatusOK, "pong")
 }
 
@@ -259,7 +272,7 @@ func (h *Handler) Ping(c echo.Context) error {
 // @Router /_ [get]
 // @Success 200 {string} string "Hello, Admin!"
 // @Failure 401 {string} string "invalid session"
-func (h *Handler) AdminRoute(c echo.Context) error {
+func (h *handler) AdminRoute(c echo.Context) error {
 	return c.String(http.StatusOK, "Hello, Admin!")
 }
 
@@ -267,7 +280,7 @@ func (h *Handler) AdminRoute(c echo.Context) error {
 // @Description Get client config.
 // @Router /config [get]
 // @Success 200 {object} config.Client
-func (h *Handler) GetConfig(c echo.Context) error {
+func (h *handler) GetConfig(c echo.Context) error {
 	clientConfig := config.Client{
 		Env: h.config.Env,
 	}

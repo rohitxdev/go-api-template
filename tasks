@@ -56,7 +56,7 @@ case $1 in
     ./bin/build
     ;;
 "build")
-    swag init -g internal/api/router.go
+    swag init -g internal/handler/router.go
     echo "building app..." && CGO_ENABLED=0 go build --pgo default.pgo "${build_release_args[@]}" -o ./bin/build ./main.go && echo "built app successfully ✔"
     ;;
 "test")

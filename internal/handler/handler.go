@@ -1,4 +1,4 @@
-package api
+package handler
 
 import (
 	"embed"
@@ -13,7 +13,7 @@ import (
 	"github.com/rohitxdev/go-api-template/pkg/storage"
 )
 
-type HandlerOpts struct {
+type Opts struct {
 	Config   *config.Server
 	Kv       *sqlite.KV
 	Repo     *repo.Repo
@@ -21,27 +21,14 @@ type HandlerOpts struct {
 	Fs       *storage.Client
 	StaticFS *embed.FS
 }
-type Handler struct {
+
+type handler struct {
 	config   *config.Server
 	kv       *sqlite.KV
 	repo     *repo.Repo
 	email    *email.Client
 	fs       *storage.Client
 	staticFS *embed.FS
-}
-
-func New(opts *HandlerOpts) *Handler {
-	if opts == nil {
-		return nil
-	}
-	return &Handler{
-		config:   opts.Config,
-		kv:       opts.Kv,
-		repo:     opts.Repo,
-		email:    opts.Email,
-		fs:       opts.Fs,
-		staticFS: opts.StaticFS,
-	}
 }
 
 // bindAndValidate binds path params, query params and the request body into provided type `i` and validates provided `i`. The default binder binds body based on Content-Type header. Validator must be registered using `Echo#Validator`.

@@ -58,4 +58,4 @@ USER non_root_user
 
 EXPOSE 8000
 
-CMD ["/app/build" ]
+CMD ["/app/build"]
