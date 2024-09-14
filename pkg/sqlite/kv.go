@@ -27,22 +27,22 @@ func NewKV(name string, cleanUpFreq time.Duration) (*KV, error) {
 		return nil, err
 	}
 
-	getStmt, err := db.Prepare("SELECT value FROM kv WHERE key = ? AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP);")
+	getStmt, err := db.Prepare("SELECT value FROM kv WHERE key = $1 AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP);")
 	if err != nil {
 		return nil, err
 	}
 
-	setStmt, err := db.Prepare("INSERT INTO kv(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value = ?;")
+	setStmt, err := db.Prepare("INSERT INTO kv(key, value) VALUES($1, $2) ON CONFLICT(key) DO UPDATE SET value = $2;")
 	if err != nil {
 		return nil, err
 	}
 
-	setWithExpiryStmt, err := db.Prepare("INSERT INTO kv(key, value, expires_at) VALUES(?, ?, datetime('now', ?)) ON CONFLICT(key) DO UPDATE SET value = ?, expires_at = datetime('now', ?);")
+	setWithExpiryStmt, err := db.Prepare("INSERT INTO kv(key, value, expires_at) VALUES($1, $2, datetime('now', $3)) ON CONFLICT(key) DO UPDATE SET value = $2, expires_at = datetime('now', $3);")
 	if err != nil {
 		return nil, err
 	}
 
-	deleteStmt, err := db.Prepare("DELETE FROM kv WHERE key = ?")
+	deleteStmt, err := db.Prepare("DELETE FROM kv WHERE key = $1")
 	if err != nil {
 		return nil, err
 	}
