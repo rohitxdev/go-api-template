@@ -2,9 +2,15 @@ package sqlite
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
+)
+
+var (
+	ErrKeyNotFound = errors.New("key not found")
+	ErrKeyExpired  = errors.New("key expired")
 )
 
 type KV struct {
@@ -27,7 +33,7 @@ func NewKV(name string, cleanUpFreq time.Duration) (*KV, error) {
 		return nil, err
 	}
 
-	getStmt, err := db.Prepare("SELECT value FROM kv WHERE key = $1 AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP);")
+	getStmt, err := db.Prepare("SELECT value, expires_at FROM kv WHERE key = $1 AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP);")
 	if err != nil {
 		return nil, err
 	}
@@ -80,8 +86,18 @@ func (kv *KV) Close() error {
 
 func (kv *KV) Get(key string) (string, error) {
 	var value string
-	err := kv.getStmt.QueryRow(key).Scan(&value)
-	return value, err
+	var expiresAt time.Time
+	err := kv.getStmt.QueryRow(key).Scan(&value, &expiresAt)
+	if err == sql.ErrNoRows {
+		return "", ErrKeyNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+	if expiresAt.Before(time.Now()) {
+		return "", ErrKeyExpired
+	}
+	return value, nil
 }
 
 func (kv *KV) Set(key string, value string) error {

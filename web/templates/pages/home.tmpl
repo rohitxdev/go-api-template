@@ -11,6 +11,7 @@
         place-content: center;
         place-items: center;
         font-family: monospace;
+        text-align: center;
     }
 
     ul{
@@ -20,6 +21,10 @@
     
     li{
         line-height: 1.5;
+    }
+
+    span[scope="row"]{
+        font-weight: bold;
     }
 </style>
 
@@ -32,14 +37,7 @@
 </head>
 
 <body>
-    <pre>
-   ______                  ______     __             ___    ____  ____   
-  / ____/___       __     / ____/____/ /_  ____     /   |  / __ \/  _/   
- / / __/ __ \   __/ /_   / __/ / ___/ __ \/ __ \   / /| | / /_/ // /     
-/ /_/ / /_/ /  /_  __/  / /___/ /__/ / / / /_/ /  / ___ |/ ____// /      
-\____/\____/    /_/    /_____/\___/_/ /_/\____/  /_/  |_/_/   /___/      
-                                                                         
-    </pre>
+    <h1>Go + Echo API</h1>
     <img src="images/go-fast.png" alt="Gopher running fast" height="200" width="200"/>
     <ul>
         {{range $k,$v := .}}
