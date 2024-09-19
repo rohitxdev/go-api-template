@@ -85,20 +85,20 @@ case $1 in
     ;;
 *)
     menu="
- 1) docker-watch    -  Run development server in docker
- 2) docker-build    -  Build docker image
- 3) docker-push     -  Push docker image to dockerhub
- 4) watch           -  Run go app and watch for changes
- 5) run             -  Run go app without building (for development)
- 6) start           -  Run go app build
- 7) build           -  Build go app (for release)
- 8) test            -  Run tests
- 9) test-cover      -  Run tests and show coverage
-10) bench           -  Run benchmarks
-11) clean           -  Clean go mod & cache
-12) init            -  Install dependencies
-13) pprof           -  Generate pprof profile
-14) checkpoint      -  Create a git checkpoint and push to remote
+=> docker-watch    -  Run development server in docker
+=> docker-build    -  Build docker image
+=> docker-push     -  Push docker image to dockerhub
+=> watch           -  Run go app and watch for changes
+=> run             -  Run go app without building (for development)
+=> start           -  Run go app build
+=> build           -  Build go app (for release)
+=> test            -  Run tests
+=> test-cover      -  Run tests and show coverage
+=> bench           -  Run benchmarks
+=> clean           -  Clean go mod & cache
+=> init            -  Install dependencies
+=> pprof           -  Generate pprof profile
+=> checkpoint      -  Create a git checkpoint and push to remote
 "
     printf "\x1b[95m %s\x1b[0m%s\n%s\n" "Available tasks" "$menu" "Usage: $0 <task>"
     ;;

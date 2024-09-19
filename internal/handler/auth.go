@@ -82,13 +82,14 @@ func (h *handler) SignUp(c echo.Context) error {
 	if err := bindAndValidate(c, req); err != nil {
 		return err
 	}
-	user := new(repo.UserCore)
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), 12)
 	if err != nil {
 		return err
 	}
-	user.Email = SanitizeEmail(req.Email)
-	user.PasswordHash = string(passwordHash)
+	user := &repo.UserCore{
+		Email:        SanitizeEmail(req.Email),
+		PasswordHash: string(passwordHash),
+	}
 	userId, err := h.repo.CreateUser(c.Request().Context(), user)
 	if err != nil {
 		fmt.Println(err)
