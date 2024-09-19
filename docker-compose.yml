@@ -5,7 +5,6 @@ services:
       target: development
       args:
         GO_VERSION: ${GO_VERSION}
-    container_name: api
     volumes:
       - .:/app
     ports:

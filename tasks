@@ -41,7 +41,7 @@ case $1 in
     ;;
 "watch")
     # build.kill_delay is in nanoseconds
-    air --tmp_dir="bin/tmp" --build.bin="\"$0\" run" --build.delay="0" --build.kill_delay="10000000000" \
+    air --build.bin="\"$0\" run" --build.delay="0" --build.kill_delay="10000000000" \
         --build.include_ext="go,tmpl,env" --build.send_interrupt="true" --log.main_only="true" --misc.clean_on_exit="true"
     ;;
 "run")
