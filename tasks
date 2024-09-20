@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+[[ ! -x "$0" ]] && chmod +x "$0"
+
 set -o allexport
 
 ENV_FILE="${ENV_FILE:-".env"}"
