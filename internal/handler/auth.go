@@ -12,6 +12,10 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const (
+	sessionMaxAge = 86400 * 7 // 7 days
+)
+
 var (
 	ErrUserNotLoggedIn = errors.New("user is not logged in")
 )
@@ -23,7 +27,7 @@ func createSession(c echo.Context, userId string) (*sessions.Session, error) {
 	}
 	sess.Options = &sessions.Options{
 		Path:     "/",
-		MaxAge:   86400 * 7,
+		MaxAge:   sessionMaxAge,
 		HttpOnly: true,
 	}
 	sess.Values["user_id"] = userId
