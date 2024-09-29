@@ -1,15 +1,13 @@
 package storage
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"io"
-	"net/http"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	awsConfig "github.com/aws/aws-sdk-go-v2/config"
+	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
@@ -18,16 +16,21 @@ var (
 	ErrFileEmpty = errors.New("file is empty")
 )
 
-func InitS3Client(endpoint string, region string, accessKeyId string, accessKeySecret string) (*s3.Client, error) {
+type Client struct {
+	client    *s3.Client
+	presigner *s3.PresignClient
+}
+
+func New(endpoint string, region string, accessKeyId string, accessKeySecret string) (*Client, error) {
 	r2Resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 		return aws.Endpoint{
 			URL: endpoint,
 		}, nil
 	})
 
-	cfg, err := awsConfig.LoadDefaultConfig(context.TODO(),
-		awsConfig.WithEndpointResolverWithOptions(r2Resolver),
-		awsConfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKeyId, accessKeySecret, "")),
+	cfg, err := config.LoadDefaultConfig(context.TODO(),
+		config.WithEndpointResolverWithOptions(r2Resolver),
+		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKeyId, accessKeySecret, "")),
 	)
 	if err != nil {
 		return nil, errors.Join(errors.New("could not load default config of S3 client"), err)
@@ -35,61 +38,36 @@ func InitS3Client(endpoint string, region string, accessKeyId string, accessKeyS
 
 	cfg.Region = region
 
-	return s3.NewFromConfig(cfg), nil
-}
+	s3Client := s3.NewFromConfig(cfg)
 
-type Client struct {
-	client *s3.Client
-}
-
-func New(endpoint string, region string, accessKeyId string, accessKeySecret string) (*Client, error) {
-	s := new(Client)
-	client, err := InitS3Client(endpoint, region, accessKeyId, accessKeySecret)
-	if err != nil {
-		return nil, err
+	client := Client{
+		client:    s3Client,
+		presigner: s3.NewPresignClient(s3Client),
 	}
-	s.client = client
-	return s, nil
+
+	return &client, nil
 }
 
 /*----------------------------------- Upload File To Bucket ----------------------------------- */
 
-func (s *Client) Upload(ctx context.Context, bucketName string, fileName string, fileContent []byte) error {
-	contentType := http.DetectContentType(fileContent)
-	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
+func (s *Client) PresignPutObject(ctx context.Context, bucketName string, fileName string, contentType string) (*v4.PresignedHTTPRequest, error) {
+	request, err := s.presigner.PresignPutObject(ctx, &s3.PutObjectInput{
 		Bucket:      &bucketName,
 		Key:         &fileName,
-		Body:        bytes.NewReader(fileContent),
 		ContentType: &contentType})
-	return err
+	return request, err
 }
 
 /*----------------------------------- Get File From Bucket ----------------------------------- */
 
-func (s *Client) Get(ctx context.Context, bucketName string, fileName string) ([]byte, error) {
-	obj, err := s.client.GetObject(ctx, &s3.GetObjectInput{Bucket: &bucketName, Key: &fileName})
-	if err != nil {
-		return nil, err
-	}
-
-	fileContent, err := io.ReadAll(obj.Body)
-	if err != nil {
-		return nil, err
-	}
-	defer obj.Body.Close()
-
-	if len(fileContent) == 0 {
-		return nil, ErrFileEmpty
-	}
-
-	return fileContent, nil
+func (s *Client) PresignGetObject(ctx context.Context, bucketName string, fileName string) (*v4.PresignedHTTPRequest, error) {
+	return s.presigner.PresignGetObject(ctx, &s3.GetObjectInput{Bucket: &bucketName, Key: &fileName}, func(po *s3.PresignOptions) { po.Expires = time.Minute * 2 })
 }
 
 /*----------------------------------- Delete File From Bucket ----------------------------------- */
 
-func (s *Client) Delete(ctx context.Context, bucketName string, fileName string) error {
-	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: &bucketName, Key: &fileName})
-	return err
+func (s *Client) PresignDeleteObject(ctx context.Context, bucketName string, fileName string) (*v4.PresignedHTTPRequest, error) {
+	return s.presigner.PresignDeleteObject(ctx, &s3.DeleteObjectInput{Bucket: &bucketName, Key: &fileName})
 }
 
 /*----------------------------------- Get List Of Files ----------------------------------- */

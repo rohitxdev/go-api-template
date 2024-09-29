@@ -10,6 +10,10 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+const (
+	inMemoryDbName = ":memory:"
+)
+
 var (
 	ErrIsNotDir  = errors.New("is not a directory")
 	ErrCreateDir = errors.New("could not create directory")
@@ -35,12 +39,20 @@ func createDirIfNotExists(path string) error {
 	return nil
 }
 
+// Pass :memory: for in-memory database.
 func NewDB(name string) (*sql.DB, error) {
-	dirName := "db"
-	if err := createDirIfNotExists(dirName); err != nil && err != ErrIsNotDir {
-		return nil, err
+	var db *sql.DB
+	var err error
+
+	if name == inMemoryDbName {
+		db, err = sql.Open("sqlite", name)
+	} else {
+		dirName := "db"
+		if err = createDirIfNotExists(dirName); err != nil && err != ErrIsNotDir {
+			return nil, err
+		}
+		db, err = sql.Open("sqlite", fmt.Sprintf("%s/%s.db", dirName, name))
 	}
-	db, err := sql.Open("sqlite", fmt.Sprintf("%s/%s.db", dirName, name))
 	if err != nil {
 		return nil, err
 	}

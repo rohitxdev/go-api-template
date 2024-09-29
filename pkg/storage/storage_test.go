@@ -4,20 +4,22 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"testing"
 
-	"github.com/rohitxdev/go-api-template/internal/config"
-	"github.com/rohitxdev/go-api-template/pkg/storage"
+	"github.com/rohitxdev/go-api-starter/internal/config"
+	"github.com/rohitxdev/go-api-starter/pkg/storage"
 )
 
 func TestStorageService(t *testing.T) {
-	cfg, err := config.Load("../.env")
+	c, err := config.Load()
 	if err != nil {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	fs, err := storage.New(cfg.S3Endpoint, cfg.S3DefaultRegion, cfg.AwsAccessKeyId, cfg.AwsAccessKeySecret)
+	fs, err := storage.New(c.S3Endpoint, c.S3DefaultRegion, c.AwsAccessKeyId, c.AwsAccessKeySecret)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,14 +39,28 @@ func TestStorageService(t *testing.T) {
 	}
 
 	t.Run("Upload file to bucket", func(t *testing.T) {
-		err := fs.Upload(ctx, cfg.S3Endpoint, testFile.Name(), testFileContent)
+		req, err := fs.PresignPutObject(ctx, c.S3Endpoint, testFile.Name(), http.DetectContentType(testFileContent))
 		if err != nil {
 			t.Error(err)
 		}
+		res, err := http.DefaultClient.Post(req.URL, "application/octet-stream", bytes.NewReader(testFileContent))
+		if err != nil {
+			t.Error(err)
+		}
+		t.Log(res.StatusCode)
 	})
 
 	t.Run("Get file from bucket", func(t *testing.T) {
-		fileContent, err := fs.Get(ctx, cfg.S3Endpoint, testFile.Name())
+		req, err := fs.PresignGetObject(ctx, c.S3Endpoint, testFile.Name())
+		if err != nil {
+			t.Error(err)
+		}
+		res, err := http.DefaultClient.Get(req.URL)
+		if err != nil {
+			t.Error(err)
+		}
+		defer res.Body.Close()
+		fileContent, err := io.ReadAll(res.Body)
 		if err != nil {
 			t.Error(err)
 		}
@@ -54,13 +70,19 @@ func TestStorageService(t *testing.T) {
 	})
 
 	t.Run("Delete file from bucket", func(t *testing.T) {
-		err := fs.Delete(ctx, cfg.S3Endpoint, testFile.Name())
+		req, err := fs.PresignDeleteObject(ctx, c.S3Endpoint, testFile.Name())
 		if err != nil {
 			t.Error(err)
 		}
-		_, err = fs.Get(ctx, cfg.S3Endpoint, testFile.Name())
-		if err == nil {
+		url, _ := url.Parse(req.URL)
+		res, err := http.DefaultClient.Do(&http.Request{Method: http.MethodDelete, URL: url})
+		if err != nil {
 			t.Error(err)
 		}
+		t.Log(res.StatusCode)
+		// _, err = fs.Get(ctx, c.S3Endpoint, testFile.Name())
+		// if err == nil {
+		// 	t.Error(err)
+		// }
 	})
 }

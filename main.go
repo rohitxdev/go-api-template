@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"embed"
 	"errors"
+	"flag"
 	"log/slog"
 	"net"
 	"net/http"
@@ -12,19 +13,29 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/rohitxdev/go-api-template/internal/config"
-	"github.com/rohitxdev/go-api-template/internal/handler"
-	"github.com/rohitxdev/go-api-template/pkg/prettylog"
-	"github.com/rohitxdev/go-api-template/pkg/repo"
-	"github.com/rohitxdev/go-api-template/pkg/sqlite"
+	"github.com/rohitxdev/go-api-starter/internal/config"
+	"github.com/rohitxdev/go-api-starter/internal/handler"
+	"github.com/rohitxdev/go-api-starter/pkg/prettylog"
+	"github.com/rohitxdev/go-api-starter/pkg/repo"
+	"github.com/rohitxdev/go-api-starter/pkg/sqlite"
+	"github.com/rohitxdev/go-api-starter/pkg/storage"
 )
+
+// This is set at build time.
+var BuildId string
 
 //go:embed web
 var staticFS embed.FS
 
 func main() {
+	if BuildId == "" {
+		panic("build id is empty")
+	}
+
 	//Load config
-	cfg, err := config.Load(".env")
+	envFile := flag.String("env-file", ".env", "Path to .env file")
+	flag.Parse()
+	c, err := config.Load(*envFile)
 	if err != nil {
 		panic("load config: " + err.Error())
 	}
@@ -40,17 +51,19 @@ func main() {
 		},
 	}
 
-	var logHandler slog.Handler = slog.NewJSONHandler(os.Stderr, &logOpts)
-	if cfg.IsDev {
+	var logHandler slog.Handler
+	if c.Env == config.EnvDevelopment {
 		logHandler = prettylog.NewHandler(os.Stderr, &logOpts)
+	} else {
+		logHandler = slog.NewJSONHandler(os.Stderr, &logOpts)
 	}
 
 	slog.SetDefault(slog.New(logHandler))
 
-	slog.Debug(cfg.BuildInfo + " is running in " + cfg.Env + " environment")
+	slog.Debug(BuildId + " is running in " + c.Env + " environment")
 
 	//Connect to database
-	db, err := sql.Open("postgres", cfg.DatabaseUrl)
+	db, err := sql.Open("postgres", c.DatabaseUrl)
 	if err != nil {
 		panic("connect to database: " + err.Error())
 	}
@@ -68,7 +81,7 @@ func main() {
 	slog.Debug("connected to database ✔︎")
 
 	//Connect to kv store
-	kv, err := sqlite.NewKV("kv", time.Minute*5)
+	kv, err := sqlite.NewKV("kv", sqlite.KVOpts{CleanUpFreq: time.Minute * 5})
 	if err != nil {
 		panic("connect to kv store: " + err.Error())
 	}
@@ -82,12 +95,17 @@ func main() {
 	r := repo.New(db)
 	defer r.Close()
 
+	s3Client, err := storage.New(c.S3Endpoint, c.S3DefaultRegion, c.AwsAccessKeyId, c.AwsAccessKeySecret)
+	if err != nil {
+		panic("connect to s3 client: " + err.Error())
+	}
+
 	opts := handler.Opts{
-		Config:   cfg,
+		Config:   c,
 		Kv:       kv,
 		Repo:     r,
 		Email:    nil,
-		Fs:       nil,
+		Fs:       s3Client,
 		StaticFS: &staticFS,
 	}
 
@@ -97,7 +115,7 @@ func main() {
 	}
 
 	//Create tcp listener & start server
-	ls, err := net.Listen("tcp", cfg.Host+":"+cfg.Port)
+	ls, err := net.Listen("tcp", c.Host+":"+c.Port)
 	if err != nil {
 		panic("tcp listen: " + err.Error())
 	}
@@ -124,7 +142,7 @@ func main() {
 
 	<-ctx.Done()
 
-	ctx, cancel = context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+	ctx, cancel = context.WithTimeout(context.Background(), c.ShutdownTimeout)
 	defer cancel()
 
 	if err := e.Shutdown(ctx); err != nil {

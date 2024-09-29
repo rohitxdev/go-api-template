@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/lib/pq"
-	"github.com/rohitxdev/go-api-template/pkg/id"
+	"github.com/rohitxdev/go-api-starter/pkg/id"
 )
 
 var (

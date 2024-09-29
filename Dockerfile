@@ -33,13 +33,13 @@ RUN go mod download
 
 COPY . .
 
-RUN GOARCH=$TARGETARCH GOOS=$TARGETOS ./tasks build
+RUN GOARCH=$TARGETARCH GOOS=$TARGETOS ./tasks init && ./tasks build
 
 
 # Production image
 FROM --platform=$BUILDPLATFORM $IMAGE_OS:$IMAGE_OS_VERSION AS production
 
-COPY --from=builder /app/bin/release_build /app/release_build
+COPY --from=builder /app/bin/build /app/build
 
 # Create a non-privileged user that the app will run under.
 # See https://docs.docker.com/go/dockerfile-user-best-practices/
@@ -56,6 +56,6 @@ RUN adduser \
 
 USER non_root_user
 
-EXPOSE 8000
+EXPOSE 8080
 
 CMD ["/app/build"]

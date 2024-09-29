@@ -18,14 +18,14 @@ import (
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/rohitxdev/go-api-template/docs"
-	"github.com/rohitxdev/go-api-template/internal/config"
-	"github.com/rohitxdev/go-api-template/pkg/id"
-	"github.com/rohitxdev/go-api-template/pkg/repo"
+	"github.com/rohitxdev/go-api-starter/docs"
+	"github.com/rohitxdev/go-api-starter/internal/config"
+	"github.com/rohitxdev/go-api-starter/pkg/id"
+	"github.com/rohitxdev/go-api-starter/pkg/repo"
 	echoSwagger "github.com/swaggo/echo-swagger"
 	"golang.org/x/time/rate"
 
-	_ "github.com/rohitxdev/go-api-template/docs"
+	_ "github.com/rohitxdev/go-api-starter/docs"
 )
 
 // Custom view renderer
@@ -114,9 +114,7 @@ func New(opts *Opts) (*echo.Echo, error) {
 		echo.TrustPrivateNet(false), // e.g. ipv4 start with 10. or 192.168
 	)
 
-	if !h.config.IsDev {
-		e.Pre(middleware.CSRF())
-	}
+	e.Pre(middleware.CSRF())
 
 	e.Pre(middleware.StaticWithConfig(middleware.StaticConfig{
 		Root:       "web",
@@ -125,9 +123,7 @@ func New(opts *Opts) (*echo.Echo, error) {
 
 	e.Pre(middleware.Secure())
 
-	if h.config.IsDev {
-		e.Pre(middleware.CORSWithConfig(middleware.CORSConfig{AllowOrigins: []string{"*"}}))
-	}
+	e.Pre(middleware.CORSWithConfig(middleware.CORSConfig{AllowOrigins: h.config.AllowedOrigins}))
 
 	e.Pre(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
 		Timeout: 5 * time.Second, Skipper: func(c echo.Context) bool {
@@ -243,6 +239,8 @@ func New(opts *Opts) (*echo.Echo, error) {
 	e.GET("/_", h.AdminRoute, h.protected(RoleAdmin))
 
 	e.GET("/config", h.GetConfig)
+
+	e.GET("/files/:file_name", h.GetFile)
 
 	v1 := e.Group("/v1")
 	{

@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rohitxdev/go-api-template/pkg/assert"
-	"github.com/rohitxdev/go-api-template/pkg/repo"
+	"github.com/rohitxdev/go-api-starter/pkg/repo"
+	"github.com/stretchr/testify/assert"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
@@ -36,8 +36,8 @@ func TestNew(t *testing.T) {
 
 func TestRepo_Migrate(t *testing.T) {
 	tests := []struct {
-		name    string
 		repo    *repo.Repo
+		name    string
 		wantErr bool
 	}{
 		// TODO: Add test cases.

@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-[[ ! -x "$0" ]] && chmod +x "$0"
-
 set -o allexport
 
 ENV_FILE="${ENV_FILE:-".env"}"
@@ -16,92 +14,113 @@ fi
 GO_VERSION=$(go list -m -f "{{.GoVersion}}")
 PACKAGE_NAME=$(go list -m)
 APP_NAME=${PACKAGE_NAME##*/}
-APP_VERSION=$(git describe --tags --always --dirty)
+APP_VERSION=$(git describe --tags --always)
 DOCKERHUB_REPO_NAME=$(echo "$PACKAGE_NAME" | awk -F'/' '{print $2 "/" $3}')
 
 set +o allexport
 
 set -e
 
-build_name_prefix="$APP_NAME.$APP_VERSION"
-build_debug_args=(--ldflags="-X $PACKAGE_NAME/internal/config.BuildInfo=$build_name_prefix.debug" --race)
-build_release_args=(--ldflags="-s -w -X $PACKAGE_NAME/internal/config.BuildInfo=$build_name_prefix.release -extldflags=-static" --trimpath --buildmode=pie)
-
-case $1 in
-"docker-watch")
-    compose_file="docker-compose.yml"
+# Run development server in docker
+function docker-watch() {
+    local compose_file="docker-compose.yaml"
     docker compose -f "$compose_file" down --remove-orphans
     docker compose -f "$compose_file" up --build
-    ;;
-"docker-build")
-    docker build --tag="$APP_NAME":"$APP_VERSION" --target="prod" --build-arg="GO_VERSION=$GO_VERSION" .
-    ;;
-"docker-push")
+}
+
+# Build docker image
+function docker-build() {
+    docker build --tag="$APP_NAME:$APP_VERSION" --target="production" --build-arg="GO_VERSION=$GO_VERSION" .
+}
+
+# Push docker image to dockerhub
+function docker-push() {
     docker login
-    docker tag "$APP_NAME":"$APP_VERSION" "$DOCKERHUB_REPO_NAME":"$APP_VERSION"
-    docker push "$DOCKERHUB_REPO_NAME":"$APP_VERSION"
-    ;;
-"watch")
+    docker tag "$APP_NAME:$APP_VERSION" "$DOCKERHUB_REPO_NAME:$APP_VERSION"
+    docker push "$DOCKERHUB_REPO_NAME:$APP_VERSION"
+}
+
+# Run go app and watch for changes
+function watch() {
+    local build_path="./tmp/build"
     # build.kill_delay is in nanoseconds
-    air --build.bin="\"$0\" run" --build.delay="0" --build.kill_delay="10000000000" \
+    air --build.cmd="go build --ldflags=\"-X main.BuildId=$APP_NAME.$APP_VERSION.debug\" --race -o $build_path  ." \
+        --build.bin="$build_path" --build.delay="0" --build.kill_delay="10000000000" \
         --build.include_ext="go,tmpl,env" --build.send_interrupt="true" --log.main_only="true" --misc.clean_on_exit="true"
-    ;;
-"run")
-    go run "${build_debug_args[@]}" .
-    ;;
-"start")
-    if [[ ! -x "./bin/build" ]]; then
+}
+
+# Build go app for release and generate swagger docs
+function build() {
+    swag init -g internal/handler/router.go || {
+        echo "swag init failed"
+        exit 1
+    }
+    echo "building app..."
+    if CGO_ENABLED=0 go build --ldflags="-s -w -X main.BuildId=$APP_NAME.$APP_VERSION.release -extldflags=-static" \
+        --trimpath --buildmode=pie --pgo default.pgo -o ./bin/build .; then
+        echo "build successful ✅"
+    else
+        echo "build failed ❌"
+        exit 1
+    fi
+}
+
+# Run go app build
+function start() {
+    local build_path="./bin/build"
+    if [[ ! -x "$build_path" ]]; then
         echo "Build not found. Building..."
-        sleep 1
         $0 build
     fi
-    ./bin/build
-    ;;
-"build")
-    swag init -g internal/handler/router.go
-    echo "building app..." && CGO_ENABLED=0 go build --pgo default.pgo "${build_release_args[@]}" -o ./bin/build ./main.go && echo "built app successfully ✔"
-    ;;
-"test")
+    $build_path
+}
+
+# Run tests
+function test() {
     go test --race --count=2 -v ./...
-    ;;
-"test-cover")
+}
+
+# Run tests and show coverage
+function test-cover() {
     go test --race --coverprofile=./tmp/coverage.out ./... && go tool cover --html=./tmp/coverage.out
-    ;;
-"bench")
+}
+
+# Run benchmarks
+function bench() {
     go test --race --count=2 -v --benchmem --bench=. ./...
-    ;;
-"clean")
+}
+
+# Clean go mod & cache & remove build artifacts
+function clean() {
     go mod tidy
     go clean --cache
-    ;;
-"init")
+    rm -rf ./bin ./tmp
+}
+
+# Install dependencies
+function init() {
     go install github.com/air-verse/air@latest
     go install github.com/swaggo/swag/cmd/swag@latest
     go mod download
-    ;;
-"pprof")
-    curl "http://localhost:${PORT:-"8000"}/debug/pprof/profile?seconds=30" >default.pgo
-    ;;
-"checkpoint")
+}
+
+# Generate pprof profile
+function pprof() {
+    curl "http://localhost:${PORT:-"8080"}/debug/pprof/profile?seconds=30" >default.pgo
+}
+
+# Create a git checkpoint and push to remote
+function checkpoint() {
     git add . && git commit -m "Checkpoint at $(date "+%Y-%m-%dT%H:%M:%S%z")" && git push && echo "Checkpoint created and pushed to remote ✔"
-    ;;
-*)
-    menu="
-➤ docker-watch    -  Run development server in docker
-➤ docker-build    -  Build docker image
-➤ docker-push     -  Push docker image to dockerhub
-➤ watch           -  Run go app and watch for changes
-➤ run             -  Run go app without building (for development)
-➤ start           -  Run go app build
-➤ build           -  Build go app (for release)
-➤ test            -  Run tests
-➤ test-cover      -  Run tests and show coverage
-➤ bench           -  Run benchmarks
-➤ clean           -  Clean go mod & cache
-➤ init            -  Install dependencies
-➤ pprof           -  Generate pprof profile
-➤ checkpoint      -  Create a git checkpoint and push to remote
-"
-    printf "\x1b[95m %s\x1b[0m%s\n%s\n" "Available tasks" "$menu" "Usage: $0 <task>"
-    ;;
-esac
+}
+
+menu=$(awk '/^function/ { print NR, $2 }' "$0" | while read -r v func; do
+    desc=$(awk "NR==$((v - 1))" "$0")
+    [[ "$desc" ]] && printf "➤ %-12s - %s\n" "${func//()/}" "${desc//#/}" || printf ""
+done)
+
+if declare -F "$1" >/dev/null; then
+    "$1"
+else
+    printf "\x1b[95m %s\x1b[0m\n%s\n%s\n" "Available tasks" "$menu" "Usage: $0 <task>"
+fi

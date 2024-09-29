@@ -23,7 +23,15 @@ type KV struct {
 	cleanUpFreq       time.Duration
 }
 
-func NewKV(name string, cleanUpFreq time.Duration) (*KV, error) {
+type KVOpts struct {
+	CleanUpFreq time.Duration
+	InMemory    bool
+}
+
+func NewKV(name string, opts KVOpts) (*KV, error) {
+	if opts.InMemory {
+		name = inMemoryDbName
+	}
 	db, err := NewDB(name)
 	if err != nil {
 		return nil, err
@@ -54,7 +62,7 @@ func NewKV(name string, cleanUpFreq time.Duration) (*KV, error) {
 	}
 
 	go func() {
-		t := time.NewTicker(cleanUpFreq)
+		t := time.NewTicker(opts.CleanUpFreq)
 		for {
 			<-t.C
 			if _, err := db.Exec("DELETE FROM kv WHERE expires_at IS NOT NULL AND expires_at < CURRENT_TIMESTAMP;"); err != nil {
@@ -72,7 +80,7 @@ func NewKV(name string, cleanUpFreq time.Duration) (*KV, error) {
 		setStmt:           setStmt,
 		setWithExpiryStmt: setWithExpiryStmt,
 		deleteStmt:        deleteStmt,
-		cleanUpFreq:       cleanUpFreq,
+		cleanUpFreq:       opts.CleanUpFreq,
 	}, nil
 }
 

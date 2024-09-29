@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -13,17 +14,19 @@ import (
 	"golang.org/x/oauth2/google"
 )
 
-// This is set at build time. Rest are set at run time.
-var BuildInfo string
+const (
+	EnvDevelopment = "development"
+	EnvProduction  = "production"
+)
 
 type Server struct {
 	GoogleOAuth2Config    *oauth2.Config
 	GitHubOAuth2Config    *oauth2.Config
-	BuildInfo             string `validate:"required"`
+	BuildInfo             string
+	Env                   string `validate:"required,oneof=development production"`
 	Host                  string `validate:"required,ip"`
 	Port                  string `validate:"required,gte=0"`
 	SessionSecret         string `validate:"required"`
-	Env                   string `validate:"required,oneof=development production"`
 	DatabaseUrl           string `validate:"required"`
 	SmtpHost              string `validate:"required"`
 	SmtpUsername          string `validate:"required"`
@@ -35,21 +38,21 @@ type Server struct {
 	AwsAccessKeySecret    string
 	GoogleClientId        string
 	GoogleClientSecret    string
+	AllowedOrigins        []string      `validate:"required"`
 	AccessTokenExpiresIn  time.Duration `validate:"required"`
 	RefreshTokenExpiresIn time.Duration `validate:"required"`
 	ShutdownTimeout       time.Duration `validate:"required"`
 	RateLimitPerMinute    int           `validate:"required"`
 	SmtpPort              int           `validate:"required"`
-	IsDev                 bool
 }
 
 type Client struct {
 	Env string `json:"env" validate:"required,oneof=development production"`
 }
 
-func Load(envFilePath string) (*Server, error) {
-	if err := godotenv.Load(envFilePath); err != nil {
-		fmt.Println("warning: could not load config file: " + err.Error())
+func Load(envFilePaths ...string) (*Server, error) {
+	if err := godotenv.Load(envFilePaths...); err != nil {
+		fmt.Println("warning: could not load env file(s): " + err.Error())
 	}
 
 	accessTokenExpiresIn, err := time.ParseDuration(os.Getenv("ACCESS_TOKEN_EXPIRES_IN"))
@@ -77,13 +80,11 @@ func Load(envFilePath string) (*Server, error) {
 		return nil, errors.Join(errors.New("parse rate limit"), err)
 	}
 
-	env := os.Getenv("ENV")
-
 	c := Server{
-		BuildInfo:             BuildInfo,
-		Env:                   env,
+		Env:                   os.Getenv("ENV"),
 		Host:                  os.Getenv("HOST"),
 		Port:                  os.Getenv("PORT"),
+		AllowedOrigins:        strings.Split(os.Getenv("ALLOWED_ORIGINS"), ","),
 		SessionSecret:         os.Getenv("SESSION_SECRET"),
 		DatabaseUrl:           os.Getenv("DATABASE_URL"),
 		SmtpHost:              os.Getenv("SMTP_HOST"),
@@ -101,7 +102,6 @@ func Load(envFilePath string) (*Server, error) {
 		ShutdownTimeout:       shutdownTimeout,
 		RateLimitPerMinute:    int(rateLimitPerMinute),
 		SmtpPort:              int(smtpPort),
-		IsDev:                 env != "production",
 	}
 
 	if err := validator.New().Struct(c); err != nil {

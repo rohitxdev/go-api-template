@@ -7,27 +7,30 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rohitxdev/go-api-template/pkg/assert"
-	"github.com/rohitxdev/go-api-template/pkg/sqlite"
+	"github.com/rohitxdev/go-api-starter/pkg/sqlite"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSqlite(t *testing.T) {
+	dbName := "test_db"
 	t.Run("Create DB", func(t *testing.T) {
-		db, err := sqlite.NewDB("test_db")
+		db, err := sqlite.NewDB(dbName)
 		assert.Nil(t, err)
 		defer db.Close()
 	})
 
 	t.Cleanup(func() {
-		os.RemoveAll("db")
+		os.RemoveAll(dbName)
 	})
 }
 
 func TestKV(t *testing.T) {
 	var kv *sqlite.KV
 	var err error
+
+	kvName := "test_kv"
 	t.Run("Create KV store", func(t *testing.T) {
-		kv, err = sqlite.NewKV("test_kv", time.Minute*5)
+		kv, err = sqlite.NewKV(kvName, sqlite.KVOpts{CleanUpFreq: time.Second * 10})
 		assert.Nil(t, err)
 	})
 
@@ -61,6 +64,6 @@ func TestKV(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		os.RemoveAll("db")
+		os.RemoveAll(kvName)
 	})
 }

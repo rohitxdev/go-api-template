@@ -6,11 +6,11 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
-	"github.com/rohitxdev/go-api-template/internal/config"
-	"github.com/rohitxdev/go-api-template/pkg/email"
-	"github.com/rohitxdev/go-api-template/pkg/repo"
-	"github.com/rohitxdev/go-api-template/pkg/sqlite"
-	"github.com/rohitxdev/go-api-template/pkg/storage"
+	"github.com/rohitxdev/go-api-starter/internal/config"
+	"github.com/rohitxdev/go-api-starter/pkg/email"
+	"github.com/rohitxdev/go-api-starter/pkg/repo"
+	"github.com/rohitxdev/go-api-starter/pkg/sqlite"
+	"github.com/rohitxdev/go-api-starter/pkg/storage"
 )
 
 type Opts struct {

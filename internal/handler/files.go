@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"io"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -16,11 +15,11 @@ func (h *handler) GetFile(c echo.Context) error {
 	if err := bindAndValidate(c, req); err != nil {
 		return err
 	}
-	file, err := h.fs.Get(c.Request().Context(), h.config.S3BucketName, req.FileName)
+	presignedReq, err := h.fs.PresignGetObject(c.Request().Context(), h.config.S3BucketName, req.FileName)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
-	return c.Blob(http.StatusFound, http.DetectContentType(file), file)
+	return c.JSON(http.StatusOK, presignedReq)
 }
 
 type putFileRequest struct {
@@ -41,14 +40,14 @@ func (h *handler) PutFile(c echo.Context) error {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
 	defer f.Close()
-	fileContent, err := io.ReadAll(f)
+	// fileContent, err := io.ReadAll(f)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
-	err = h.fs.Upload(c.Request().Context(), h.config.S3BucketName, file.Filename, fileContent)
-	if err != nil {
-		return c.String(http.StatusInternalServerError, err.Error())
-	}
+	// err = h.fs.Upload(c.Request().Context(), h.config.S3BucketName, file.Filename, fileContent)
+	// if err != nil {
+	// 	return c.String(http.StatusInternalServerError, err.Error())
+	// }
 	return c.NoContent(http.StatusOK)
 }
 
