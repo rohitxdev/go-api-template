@@ -15,12 +15,12 @@ jobs:
         run: echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
       - name: Build Docker image
-        run: git describe --tags --always
+        run: env
 
       - name: Push Docker image to Docker Hub
-        run: docker push ${{env.APP_NAME}}:${{env.APP_VERSION}}
+        run: docker push ${{secrets.DOCKERHUB_REPO_NAME}}:${{ github.sha }}
 
       - name: Tag and Push Docker image as latest
         run: |
-          docker tag ${{env.APP_NAME}}:${{env.APP_VERSION}} ${{secrets.DOCKERHUB_REPO_NAME}}:latest
+          docker tag ${{secrets.DOCKERHUB_REPO_NAME}}:${{ github.sha }} ${{secrets.DOCKERHUB_REPO_NAME}}:latest
           docker push ${{secrets.DOCKERHUB_REPO_NAME}}:latest
