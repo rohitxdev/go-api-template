@@ -111,14 +111,15 @@ function pprof() {
     curl "http://localhost:${PORT:-"8080"}/debug/pprof/profile?seconds=30" >default.pgo
 }
 
-# Create a git checkpoint and push to remote repository
+# Create a git checkpoint and push to origin
 function checkpoint() {
     local res
-    read -p "Create git checkpoint and push to remote repository? (y/n): " -rs res
+    read -p "Create git checkpoint and push to origin? (y/n): " -rs res
     echo
 
     if [[ "$res" == "y" || "$res" == "Y" ]]; then
-        git add . && git commit -m "Checkpoint at $(date '+%Y-%m-%dT%H:%M:%S%z')" && git push && printf "\x1b[92m%s\x1b[0m\n" "Checkpoint created and pushed to remote ✔"
+        printf "\x1b[92m%s\x1b[0m\n" "Creating checkpoint..."
+        git add . && git commit -m "Checkpoint at $(date '+%Y-%m-%dT%H:%M:%S%z')" && git push && printf "\x1b[92m%s\x1b[0m\n" "Created checkpoint and pushed to origin ✔" || printf "\x1b[91m%s\x1b[0m\n" "Failed to create checkpoint"
     else
         printf "\x1b[95m%s\x1b[0m\n" "Quitting..."
     fi
