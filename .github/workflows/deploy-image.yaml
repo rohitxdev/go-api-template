@@ -15,7 +15,7 @@ jobs:
         run: echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
       - name: Build Docker image
-        run: ./tasks docker-build && ls
+        run: git describe --tags --always
 
       - name: Push Docker image to Docker Hub
         run: docker push ${{env.APP_NAME}}:${{env.APP_VERSION}}
