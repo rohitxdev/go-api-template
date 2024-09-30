@@ -15,7 +15,6 @@ GO_VERSION=$(go list -m -f "{{.GoVersion}}")
 PACKAGE_NAME=$(go list -m)
 APP_NAME=${PACKAGE_NAME##*/}
 APP_VERSION=$(git describe --tags --always)
-DOCKERHUB_REPO_NAME=$(echo "$PACKAGE_NAME" | awk -F'/' '{print $2 "/" $3}')
 
 set +o allexport
 
