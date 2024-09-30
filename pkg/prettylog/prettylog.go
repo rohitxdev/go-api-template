@@ -1,3 +1,4 @@
+// Package prettylog provides a slog handler that pretty prints logs in JSON format for development purposes.
 package prettylog
 
 import (

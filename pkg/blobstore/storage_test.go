@@ -1,4 +1,4 @@
-package storage_test
+package blobstore_test
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/rohitxdev/go-api-starter/internal/config"
-	"github.com/rohitxdev/go-api-starter/pkg/storage"
+	"github.com/rohitxdev/go-api-starter/pkg/blobstore"
 )
 
 func TestStorageService(t *testing.T) {
@@ -19,7 +19,7 @@ func TestStorageService(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	fs, err := storage.New(c.S3Endpoint, c.S3DefaultRegion, c.AwsAccessKeyId, c.AwsAccessKeySecret)
+	fs, err := blobstore.New(c.S3Endpoint, c.S3DefaultRegion, c.AwsAccessKeyId, c.AwsAccessKeySecret)
 	if err != nil {
 		t.Fatal(err)
 	}

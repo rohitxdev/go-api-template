@@ -1,3 +1,4 @@
+// Package id provides utility functions for generating unique ids.
 package id
 
 import (

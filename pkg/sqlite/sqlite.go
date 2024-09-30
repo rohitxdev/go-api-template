@@ -1,3 +1,4 @@
+// Package sqlite provides a wrapper around SQLite database.
 package sqlite
 
 import (

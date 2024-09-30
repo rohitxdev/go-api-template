@@ -1,3 +1,4 @@
+// Package cryptoutil provides utility functions for encryption and decryption.
 package cryptoutil
 
 import (

@@ -7,10 +7,10 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/rohitxdev/go-api-starter/internal/config"
+	"github.com/rohitxdev/go-api-starter/pkg/blobstore"
 	"github.com/rohitxdev/go-api-starter/pkg/email"
 	"github.com/rohitxdev/go-api-starter/pkg/repo"
 	"github.com/rohitxdev/go-api-starter/pkg/sqlite"
-	"github.com/rohitxdev/go-api-starter/pkg/storage"
 )
 
 type Opts struct {
@@ -18,16 +18,25 @@ type Opts struct {
 	Kv       *sqlite.KV
 	Repo     *repo.Repo
 	Email    *email.Client
-	Fs       *storage.Client
+	Fs       *blobstore.Store
 	StaticFS *embed.FS
 }
+
+// type Opts struct {
+// 	Config      *config.Server   // Configuration server
+// 	KeyValue    *sqlite.KV       // Key-value store abstraction
+// 	Repository  *repo.Repo       // Data repository
+// 	EmailClient *email.Client    // Email service client
+// 	FileStore   *blobstore.Store // Blob store for file storage
+// 	StaticFiles *embed.FS        // Embedded static file system
+// }
 
 type handler struct {
 	config   *config.Server
 	kv       *sqlite.KV
 	repo     *repo.Repo
 	email    *email.Client
-	fs       *storage.Client
+	fs       *blobstore.Store
 	staticFS *embed.FS
 }
 

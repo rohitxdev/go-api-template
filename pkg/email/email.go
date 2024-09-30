@@ -1,3 +1,4 @@
+// Package email provides utility functions for sending emails.
 package email
 
 import (

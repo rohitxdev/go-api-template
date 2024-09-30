@@ -15,10 +15,11 @@ import (
 
 	"github.com/rohitxdev/go-api-starter/internal/config"
 	"github.com/rohitxdev/go-api-starter/internal/handler"
+	"github.com/rohitxdev/go-api-starter/pkg/blobstore"
 	"github.com/rohitxdev/go-api-starter/pkg/prettylog"
 	"github.com/rohitxdev/go-api-starter/pkg/repo"
 	"github.com/rohitxdev/go-api-starter/pkg/sqlite"
-	"github.com/rohitxdev/go-api-starter/pkg/storage"
+	_ "go.uber.org/automaxprocs"
 )
 
 // This is set at build time.
@@ -29,12 +30,13 @@ var staticFS embed.FS
 
 func main() {
 	if BuildId == "" {
-		panic("build id is empty")
+		panic("build id is not set")
 	}
 
 	//Load config
 	envFile := flag.String("env-file", ".env", "Path to .env file")
 	flag.Parse()
+
 	c, err := config.Load(*envFile)
 	if err != nil {
 		panic("load config: " + err.Error())
@@ -95,7 +97,7 @@ func main() {
 	r := repo.New(db)
 	defer r.Close()
 
-	s3Client, err := storage.New(c.S3Endpoint, c.S3DefaultRegion, c.AwsAccessKeyId, c.AwsAccessKeySecret)
+	s3Client, err := blobstore.New(c.S3Endpoint, c.S3DefaultRegion, c.AwsAccessKeyId, c.AwsAccessKeySecret)
 	if err != nil {
 		panic("connect to s3 client: " + err.Error())
 	}

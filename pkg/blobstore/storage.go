@@ -1,4 +1,5 @@
-package storage
+// Package blobstore provides a wrapper around S3 client.
+package blobstore
 
 import (
 	"context"
@@ -16,12 +17,12 @@ var (
 	ErrFileEmpty = errors.New("file is empty")
 )
 
-type Client struct {
+type Store struct {
 	client    *s3.Client
 	presigner *s3.PresignClient
 }
 
-func New(endpoint string, region string, accessKeyId string, accessKeySecret string) (*Client, error) {
+func New(endpoint string, region string, accessKeyId string, accessKeySecret string) (*Store, error) {
 	r2Resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 		return aws.Endpoint{
 			URL: endpoint,
@@ -40,7 +41,7 @@ func New(endpoint string, region string, accessKeyId string, accessKeySecret str
 
 	s3Client := s3.NewFromConfig(cfg)
 
-	client := Client{
+	client := Store{
 		client:    s3Client,
 		presigner: s3.NewPresignClient(s3Client),
 	}
@@ -50,7 +51,7 @@ func New(endpoint string, region string, accessKeyId string, accessKeySecret str
 
 /*----------------------------------- Upload File To Bucket ----------------------------------- */
 
-func (s *Client) PresignPutObject(ctx context.Context, bucketName string, fileName string, contentType string) (*v4.PresignedHTTPRequest, error) {
+func (s *Store) PresignPutObject(ctx context.Context, bucketName string, fileName string, contentType string) (*v4.PresignedHTTPRequest, error) {
 	request, err := s.presigner.PresignPutObject(ctx, &s3.PutObjectInput{
 		Bucket:      &bucketName,
 		Key:         &fileName,
@@ -60,13 +61,13 @@ func (s *Client) PresignPutObject(ctx context.Context, bucketName string, fileNa
 
 /*----------------------------------- Get File From Bucket ----------------------------------- */
 
-func (s *Client) PresignGetObject(ctx context.Context, bucketName string, fileName string) (*v4.PresignedHTTPRequest, error) {
+func (s *Store) PresignGetObject(ctx context.Context, bucketName string, fileName string) (*v4.PresignedHTTPRequest, error) {
 	return s.presigner.PresignGetObject(ctx, &s3.GetObjectInput{Bucket: &bucketName, Key: &fileName}, func(po *s3.PresignOptions) { po.Expires = time.Minute * 2 })
 }
 
 /*----------------------------------- Delete File From Bucket ----------------------------------- */
 
-func (s *Client) PresignDeleteObject(ctx context.Context, bucketName string, fileName string) (*v4.PresignedHTTPRequest, error) {
+func (s *Store) PresignDeleteObject(ctx context.Context, bucketName string, fileName string) (*v4.PresignedHTTPRequest, error) {
 	return s.presigner.PresignDeleteObject(ctx, &s3.DeleteObjectInput{Bucket: &bucketName, Key: &fileName})
 }
 
@@ -78,7 +79,7 @@ type FileMetaData struct {
 	SizeInBytes  uint64    `json:"size_in_bytes"`
 }
 
-func (s *Client) GetList(ctx context.Context, bucketName string, subDir string) ([]FileMetaData, error) {
+func (s *Store) GetList(ctx context.Context, bucketName string, subDir string) ([]FileMetaData, error) {
 	var continuationToken *string
 	var fileList []FileMetaData
 	for {

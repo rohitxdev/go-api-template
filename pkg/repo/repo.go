@@ -1,3 +1,4 @@
+// Package repo provides a wrapper around database.
 package repo
 
 import (
