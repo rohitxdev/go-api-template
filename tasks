@@ -57,10 +57,7 @@ function watch() {
 
 # Build go app for release and generate swagger docs
 function build() {
-    swag init -g internal/handler/routers.go || {
-        echo "swag init failed"
-        exit 1
-    }
+    swag init -g internal/handler/router.go
     echo "building app..."
     if CGO_ENABLED=0 go build --ldflags="-s -w -X main.BuildId=$APP_NAME.$APP_VERSION.release -extldflags=-static" \
         --trimpath --buildmode=pie --pgo default.pgo -o ./bin/build .; then
@@ -114,9 +111,17 @@ function pprof() {
     curl "http://localhost:${PORT:-"8080"}/debug/pprof/profile?seconds=30" >default.pgo
 }
 
-# Create a git checkpoint and push to remote
+# Create a git checkpoint and push to remote repository
 function checkpoint() {
-    git add . && git commit -m "Checkpoint at $(date "+%Y-%m-%dT%H:%M:%S%z")" && git push && echo "Checkpoint created and pushed to remote ✔"
+    local res
+    read -p "Create git checkpoint and push to remote repository? (y/n): " -rs res
+    echo
+
+    if [[ "$res" == "y" || "$res" == "Y" ]]; then
+        git add . && git commit -m "Checkpoint at $(date '+%Y-%m-%dT%H:%M:%S%z')" && git push && printf "\x1b[92m%s\x1b[0m\n" "Checkpoint created and pushed to remote ✔"
+    else
+        printf "\x1b[95m%s\x1b[0m\n" "Quitting..."
+    fi
 }
 
 menu=$(awk '/^function/ { print NR, $2 }' "$0" | while read -r v func; do
