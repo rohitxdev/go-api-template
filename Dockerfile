@@ -21,7 +21,7 @@ CMD ["./tasks","watch"]
 
 
 # Production builder image
-FROM --platform=linux/amd64 golang:$GO_VERSION-$IMAGE_OS$IMAGE_OS_VERSION AS builder
+FROM --platform=$BUILDPLATFORM golang:$GO_VERSION-$IMAGE_OS$IMAGE_OS_VERSION AS builder
 
 WORKDIR /app
 
@@ -37,7 +37,7 @@ RUN GOARCH=$TARGETARCH GOOS=$TARGETOS ./tasks init && ./tasks build
 
 
 # Production image
-FROM --platform=linux/amd64 $IMAGE_OS:$IMAGE_OS_VERSION AS production
+FROM --platform=$BUILDPLATFORM $IMAGE_OS:$IMAGE_OS_VERSION AS production
 
 COPY --from=builder /app/bin/build /app/build
 

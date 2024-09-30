@@ -30,7 +30,7 @@ function docker-watch() {
 
 # Build docker image
 function docker-build() {
-    docker build --tag="$APP_NAME:$APP_VERSION" --target="production" --build-arg="GO_VERSION=$GO_VERSION" .
+    docker build --tag="$APP_NAME:$APP_VERSION" --target="production" --platform="linux/amd64" --build-arg="GO_VERSION=$GO_VERSION" .
 }
 
 # Run docker image
@@ -60,7 +60,7 @@ function build() {
         --trimpath --buildmode=pie --pgo default.pgo -o ./bin/build .; then
         echo "build successful ✅"
     else
-        echo "build failed ❌"
+        echo "build failed "
         exit 1
     fi
 }

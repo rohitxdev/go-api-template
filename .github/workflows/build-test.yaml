@@ -1,10 +1,8 @@
-name: Build, Test, and Deploy
+name: Build and Test
 
 on:
-  push:
-    branches: ["*"]
   pull_request:
-    branches: ["*"]
+    branches: ["main"]
 
 jobs:
   build:

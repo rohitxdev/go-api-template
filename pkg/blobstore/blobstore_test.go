@@ -65,7 +65,7 @@ func TestStorageService(t *testing.T) {
 			t.Error(err)
 		}
 		if !bytes.Equal(fileContent, testFileContent) {
-			t.Error(storage.ErrFileEmpty)
+			t.Error(blobstore.ErrFileEmpty)
 		}
 	})
 
