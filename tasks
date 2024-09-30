@@ -57,7 +57,7 @@ function watch() {
 
 # Build go app for release and generate swagger docs
 function build() {
-    swag init -g internal/handler/router.go || {
+    swag init -g internal/handler/routers.go || {
         echo "swag init failed"
         exit 1
     }
