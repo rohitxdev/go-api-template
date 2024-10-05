@@ -3,6 +3,9 @@ package repo
 
 import (
 	"database/sql"
+	"errors"
+
+	"github.com/rohitxdev/go-api-starter/internal/common"
 )
 
 type Repo struct {
@@ -11,22 +14,15 @@ type Repo struct {
 }
 
 func (s *Stmts) Close() error {
-	if err := s.CreateUserTable.Close(); err != nil {
-		return err
+	var errList []error
+
+	for _, stmt := range [...]common.Closer{s.CreateUserTable, s.GetUserById, s.GetUserByEmail, s.CreateUser, s.DeleteUserById} {
+		if err := stmt.Close(); err != nil {
+			errList = append(errList, err)
+		}
 	}
-	if err := s.GetUserById.Close(); err != nil {
-		return err
-	}
-	if err := s.GetUserByEmail.Close(); err != nil {
-		return err
-	}
-	if err := s.CreateUser.Close(); err != nil {
-		return err
-	}
-	if err := s.DeleteUserById.Close(); err != nil {
-		return err
-	}
-	return nil
+
+	return errors.Join(errList...)
 }
 
 func (repo *Repo) Close() error {

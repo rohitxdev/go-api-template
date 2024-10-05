@@ -2,37 +2,33 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"embed"
 	"errors"
 	"flag"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"time"
 
 	"github.com/rohitxdev/go-api-starter/internal/config"
 	"github.com/rohitxdev/go-api-starter/internal/handler"
 	"github.com/rohitxdev/go-api-starter/pkg/blobstore"
+	"github.com/rohitxdev/go-api-starter/pkg/database"
+	"github.com/rohitxdev/go-api-starter/pkg/email"
+	"github.com/rohitxdev/go-api-starter/pkg/kvstore"
 	"github.com/rohitxdev/go-api-starter/pkg/prettylog"
 	"github.com/rohitxdev/go-api-starter/pkg/repo"
-	"github.com/rohitxdev/go-api-starter/pkg/sqlite"
 	_ "go.uber.org/automaxprocs"
 )
 
-// This is set at build time.
-var BuildId string
-
 //go:embed web
-var staticFS embed.FS
+var fileSystem embed.FS
 
 func main() {
-	if BuildId == "" {
-		panic("build id is not set")
-	}
-
 	//Load config
 	envFile := flag.String("env-file", ".env", "Path to .env file")
 	flag.Parse()
@@ -62,10 +58,10 @@ func main() {
 
 	slog.SetDefault(slog.New(logHandler))
 
-	slog.Debug(BuildId + " is running in " + c.Env + " environment")
+	slog.Debug(fmt.Sprintf("Running %s on %s in %s environment", c.BuildId, runtime.GOOS+"/"+runtime.GOARCH, c.Env))
 
-	//Connect to database
-	db, err := sql.Open("postgres", c.DatabaseUrl)
+	//Connect to postgres database
+	db, err := database.NewPostgres(c.DatabaseUrl)
 	if err != nil {
 		panic("connect to database: " + err.Error())
 	}
@@ -73,25 +69,26 @@ func main() {
 		if err = db.Close(); err != nil {
 			panic("close database: " + err.Error())
 		}
-		slog.Debug("database connection closed ✔︎")
+		slog.Debug("Database connection closed ✔︎")
 	}()
+	slog.Debug("Connected to database ✔︎")
 
-	if err = db.Ping(); err != nil {
-		panic("ping database: " + err.Error())
+	//Connect to sqlite database
+	sqliteDb, err := database.NewSqlite(":memory:")
+	if err != nil {
+		panic("connect to sqlite database: " + err.Error())
 	}
 
-	slog.Debug("connected to database ✔︎")
-
 	//Connect to kv store
-	kv, err := sqlite.NewKV("kv", sqlite.KVOpts{CleanUpFreq: time.Minute * 5})
+	kv, err := kvstore.New(sqliteDb, time.Minute*5)
 	if err != nil {
-		panic("connect to kv store: " + err.Error())
+		panic("connect to KV store: " + err.Error())
 	}
 	defer func() {
 		kv.Close()
-		slog.Debug("kv store closed ✔︎")
+		slog.Debug("KV store closed ✔︎")
 	}()
-	slog.Debug("connected to kv store ✔︎")
+	slog.Debug("Connected to kv store ✔︎")
 
 	//Create API handler
 	r := repo.New(db)
@@ -102,16 +99,18 @@ func main() {
 		panic("connect to s3 client: " + err.Error())
 	}
 
-	opts := handler.Opts{
-		Config:   c,
-		Kv:       kv,
-		Repo:     r,
-		Email:    nil,
-		Fs:       s3Client,
-		StaticFS: &staticFS,
+	h, err := handler.NewHandler(
+		handler.WithConfig(c),
+		handler.WithKVStore(kv),
+		handler.WithRepo(r),
+		handler.WithEmail(&email.Client{}),
+		handler.WithBlobStore(s3Client),
+		handler.WithFileSystem(&fileSystem),
+	)
+	if err != nil {
+		panic("create handler: " + err.Error())
 	}
-
-	e, err := handler.New(&opts)
+	e, err := handler.New(h)
 	if err != nil {
 		panic("create router: " + err.Error())
 	}
@@ -125,9 +124,9 @@ func main() {
 		if err = ls.Close(); err != nil {
 			panic("close tcp listener: " + err.Error())
 		}
-		slog.Debug("tcp listener closed ✔︎")
+		slog.Debug("TCP listener closed ✔︎")
 	}()
-	slog.Debug("tcp listener created ✔︎")
+	slog.Debug("TCP listener created ✔︎")
 
 	go func() {
 		if err := http.Serve(ls, e); err != nil && !errors.Is(err, net.ErrClosed) {
@@ -135,8 +134,8 @@ func main() {
 		}
 	}()
 
-	slog.Debug("http server started ✔︎")
-	slog.Info("server is listening to \x1b[32mhttp://" + ls.Addr().String() + "\x1b[0m and is ready to serve requests ✔︎")
+	slog.Debug("HTTP server started ✔︎")
+	slog.Info(fmt.Sprintf("Server is listening to http://%s and is ready to serve requests ✔︎", ls.Addr()))
 
 	//Shut down http server gracefully
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -151,5 +150,5 @@ func main() {
 		panic("http server shutdown: " + err.Error())
 	}
 
-	slog.Debug("shut down http server gracefully ✔︎")
+	slog.Debug("Shut down http server gracefully ✔︎")
 }

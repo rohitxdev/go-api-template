@@ -1,4 +1,4 @@
-package sqlite_test
+package kvstore_test
 
 import (
 	"database/sql"
@@ -7,30 +7,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rohitxdev/go-api-starter/pkg/sqlite"
+	"github.com/rohitxdev/go-api-starter/pkg/kvstore"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSqlite(t *testing.T) {
-	dbName := "test_db"
-	t.Run("Create DB", func(t *testing.T) {
-		db, err := sqlite.NewDB(dbName)
+func TestKVStore(t *testing.T) {
+	var kv *kvstore.KVStore
+	kvName := "test_kv"
+
+	t.Run("Create KV store", func(t *testing.T) {
+		db, err := sql.Open("sqlite3", kvName)
 		assert.Nil(t, err)
 		defer db.Close()
-	})
-
-	t.Cleanup(func() {
-		os.RemoveAll(dbName)
-	})
-}
-
-func TestKV(t *testing.T) {
-	var kv *sqlite.KV
-	var err error
-
-	kvName := "test_kv"
-	t.Run("Create KV store", func(t *testing.T) {
-		kv, err = sqlite.NewKV(kvName, sqlite.KVOpts{CleanUpFreq: time.Second * 10})
+		kv, err = kvstore.New(db, time.Second*10)
 		assert.Nil(t, err)
 	})
 

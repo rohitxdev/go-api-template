@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -107,13 +106,13 @@ func (h *logHandler) computeAttrs(ctx context.Context, r slog.Record) (map[strin
 	}()
 
 	if err := h.handler.Handle(ctx, r); err != nil {
-		return nil, errors.Join(errors.New("inner handler handle"), err)
+		return nil, fmt.Errorf("could not handle in log handler: %w", err)
 	}
 
 	var attrs = make(map[string]any)
 
 	if err := json.Unmarshal(h.buf.Bytes(), &attrs); err != nil {
-		return nil, errors.Join(errors.New("handler unmarshal"), err)
+		return nil, fmt.Errorf("could not unmarshal in log handler: %w", err)
 	}
 	return attrs, nil
 }
@@ -139,7 +138,7 @@ func (h *logHandler) Handle(ctx context.Context, r slog.Record) error {
 	if len(attrs) > 0 {
 		bytes, err := json.MarshalIndent(attrs, "", "  ")
 		if err != nil {
-			return errors.Join(errors.New("handler marshal"), err)
+			return fmt.Errorf("could not marshal in log handler: %w", err)
 		}
 		logStr += fmt.Sprintf(" %s\n", colorize(ansiGrey, string(bytes)))
 	}

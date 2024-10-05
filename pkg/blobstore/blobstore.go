@@ -4,6 +4,7 @@ package blobstore
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -34,7 +35,7 @@ func New(endpoint string, region string, accessKeyId string, accessKeySecret str
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKeyId, accessKeySecret, "")),
 	)
 	if err != nil {
-		return nil, errors.Join(errors.New("could not load default config of S3 client"), err)
+		return nil, fmt.Errorf("could not load default config of S3 client: %w", err)
 	}
 
 	cfg.Region = region

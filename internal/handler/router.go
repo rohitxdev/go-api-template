@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -13,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-playground/validator"
+	"github.com/goccy/go-json"
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo-contrib/pprof"
 	"github.com/labstack/echo-contrib/session"
@@ -77,20 +76,7 @@ func (s echoJSONSerializer) Deserialize(c echo.Context, i interface{}) error {
 // @version 1.0
 // @description This is a starter code API.
 
-func New(opts *Opts) (*echo.Echo, error) {
-	if opts == nil {
-		return nil, errors.New("opts is nil")
-	}
-
-	h := &handler{
-		config:   opts.Config,
-		kv:       opts.Kv,
-		repo:     opts.Repo,
-		email:    opts.Email,
-		fs:       opts.Fs,
-		staticFS: opts.StaticFS,
-	}
-
+func New(h *handler) (*echo.Echo, error) {
 	docs.SwaggerInfo.Host = h.config.Host + ":" + h.config.Port
 
 	e := echo.New()
@@ -100,8 +86,12 @@ func New(opts *Opts) (*echo.Echo, error) {
 
 	e.JSONSerializer = echoJSONSerializer{}
 
+	templates, err := template.ParseFS(h.fileSystem, "web/templates/**/*.tmpl")
+	if err != nil {
+		return nil, fmt.Errorf("could not parse templates: %w", err)
+	}
 	e.Renderer = echoTemplate{
-		templates: template.Must(template.ParseFS(h.staticFS, "web/templates/**/*.tmpl")),
+		templates: templates,
 	}
 
 	e.Validator = echoValidator{
@@ -118,7 +108,7 @@ func New(opts *Opts) (*echo.Echo, error) {
 
 	e.Pre(middleware.StaticWithConfig(middleware.StaticConfig{
 		Root:       "web",
-		Filesystem: http.FS(h.staticFS),
+		Filesystem: http.FS(h.fileSystem),
 	}))
 
 	e.Pre(middleware.Secure())
@@ -171,7 +161,7 @@ func New(opts *Opts) (*echo.Echo, error) {
 
 	host, err := os.Hostname()
 	if err != nil {
-		return nil, errors.Join(errors.New("could not get host name"), err)
+		return nil, fmt.Errorf("could not get host name: %w", err)
 	}
 
 	e.Pre(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
@@ -221,17 +211,22 @@ func New(opts *Opts) (*echo.Echo, error) {
 		},
 	}))
 
-	//Routes
+	// Routes
 
 	e.GET("/swagger/*", echoSwagger.EchoWrapHandler(func(c *echoSwagger.Config) { c.SyntaxHighlight = true }))
 
 	e.GET("/", func(c echo.Context) error {
 		data := echo.Map{
-			"build": h.config.BuildInfo,
-			"env":   h.config.Env,
-			"host":  host,
+			"buildId": h.config.BuildId,
+			"env":     h.config.Env,
+			"host":    host,
 		}
-		return c.Render(http.StatusOK, "home.tmpl", data)
+		switch c.Request().Header.Get("Accept") {
+		case "text/html":
+			return c.Render(http.StatusOK, "home.tmpl", data)
+		default:
+			return c.JSON(http.StatusOK, data)
+		}
 	})
 
 	e.GET("/ping", h.Ping)

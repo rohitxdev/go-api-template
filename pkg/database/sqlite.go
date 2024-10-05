@@ -1,24 +1,17 @@
 // Package sqlite provides a wrapper around SQLite database.
-package sqlite
+package database
 
 import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 
 	_ "modernc.org/sqlite"
 )
 
 const (
-	inMemoryDbName = ":memory:"
-)
-
-var (
-	ErrIsNotDir  = errors.New("is not a directory")
-	ErrCreateDir = errors.New("could not create directory")
-	ErrStatDir   = errors.New("could not stat directory")
+	dirName = "db"
 )
 
 func createDirIfNotExists(path string) error {
@@ -26,36 +19,29 @@ func createDirIfNotExists(path string) error {
 	if err != nil {
 		if os.IsNotExist(err) {
 			if err = os.Mkdir(path, 0755); err != nil {
-				return errors.Join(ErrCreateDir, err)
+				return fmt.Errorf("could not create directory: %w", err)
 			}
-			slog.Debug(fmt.Sprintf("created directory %s ✔︎", path))
 		} else {
-			// Other error
-			return errors.Join(ErrStatDir, err)
+			return fmt.Errorf("could not get stats of directory: %w", err)
 		}
 	} else if !info.IsDir() {
-		return errors.Join(ErrIsNotDir, err)
+		return fmt.Errorf("%s is not a directory", path)
 	}
-
 	return nil
 }
 
 // Pass :memory: for in-memory database.
-func NewDB(name string) (*sql.DB, error) {
-	var db *sql.DB
-	var err error
-
-	if name == inMemoryDbName {
-		db, err = sql.Open("sqlite", name)
-	} else {
-		dirName := "db"
-		if err = createDirIfNotExists(dirName); err != nil && err != ErrIsNotDir {
+func NewSqlite(dbName string) (*sql.DB, error) {
+	if dbName != ":memory:" {
+		if err := createDirIfNotExists(dirName); err != nil {
 			return nil, err
 		}
-		db, err = sql.Open("sqlite", fmt.Sprintf("%s/%s.db", dirName, name))
+		dbName = fmt.Sprintf("%s/%s.db", dirName, dbName)
 	}
+
+	db, err := sql.Open("sqlite", dbName)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not open sqlite database: %w", err)
 	}
 
 	stmts := [...]string{
@@ -67,10 +53,21 @@ func NewDB(name string) (*sql.DB, error) {
 		"PRAGMA foreign_keys = ON;",
 	}
 
+	var errList []error
+
 	for _, stmt := range stmts {
 		if _, err := db.Exec(stmt); err != nil {
-			return nil, err
+			errList = append(errList, err)
 		}
 	}
+
+	if len(errList) > 0 {
+		return nil, errors.Join(errList...)
+	}
+
+	if err := db.Ping(); err != nil {
+		return nil, fmt.Errorf("could not ping sqlite database: %w", err)
+	}
+
 	return db, nil
 }

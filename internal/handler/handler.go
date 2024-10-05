@@ -2,6 +2,7 @@ package handler
 
 import (
 	"embed"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -9,35 +10,96 @@ import (
 	"github.com/rohitxdev/go-api-starter/internal/config"
 	"github.com/rohitxdev/go-api-starter/pkg/blobstore"
 	"github.com/rohitxdev/go-api-starter/pkg/email"
+	"github.com/rohitxdev/go-api-starter/pkg/kvstore"
 	"github.com/rohitxdev/go-api-starter/pkg/repo"
-	"github.com/rohitxdev/go-api-starter/pkg/sqlite"
 )
 
-type Opts struct {
-	Config   *config.Server
-	Kv       *sqlite.KV
-	Repo     *repo.Repo
-	Email    *email.Client
-	Fs       *blobstore.Store
-	StaticFS *embed.FS
+type handlerOpts struct {
+	config     *config.Server
+	kvStore    *kvstore.KVStore
+	repo       *repo.Repo
+	email      *email.Client
+	blobstore  *blobstore.Store
+	fileSystem *embed.FS
 }
 
-// type Opts struct {
-// 	Config      *config.Server   // Configuration server
-// 	KeyValue    *sqlite.KV       // Key-value store abstraction
-// 	Repository  *repo.Repo       // Data repository
-// 	EmailClient *email.Client    // Email service client
-// 	FileStore   *blobstore.Store // Blob store for file storage
-// 	StaticFiles *embed.FS        // Embedded static file system
-// }
+func WithConfig(config *config.Server) func(*handlerOpts) {
+	return func(ho *handlerOpts) {
+		ho.config = config
+	}
+}
 
-type handler struct {
-	config   *config.Server
-	kv       *sqlite.KV
-	repo     *repo.Repo
-	email    *email.Client
-	fs       *blobstore.Store
-	staticFS *embed.FS
+func WithKVStore(kvStore *kvstore.KVStore) func(*handlerOpts) {
+	return func(ho *handlerOpts) {
+		ho.kvStore = kvStore
+	}
+}
+
+func WithRepo(repo *repo.Repo) func(*handlerOpts) {
+	return func(ho *handlerOpts) {
+		ho.repo = repo
+	}
+}
+
+func WithEmail(email *email.Client) func(*handlerOpts) {
+	return func(ho *handlerOpts) {
+		ho.email = email
+	}
+}
+
+func WithBlobStore(fs *blobstore.Store) func(*handlerOpts) {
+	return func(ho *handlerOpts) {
+		ho.blobstore = fs
+	}
+}
+
+func WithFileSystem(fileSystem *embed.FS) func(*handlerOpts) {
+	return func(ho *handlerOpts) {
+		ho.fileSystem = fileSystem
+	}
+}
+
+type handler handlerOpts
+
+func NewHandler(optFuncs ...func(*handlerOpts)) (*handler, error) {
+	opts := handlerOpts{}
+	for _, optFunc := range optFuncs {
+		optFunc(&opts)
+	}
+
+	var errList []error
+
+	if opts.config == nil {
+		errList = append(errList, errors.New("config is nil"))
+	}
+	if opts.kvStore == nil {
+		errList = append(errList, errors.New("kvStore is nil"))
+	}
+	if opts.repo == nil {
+		errList = append(errList, errors.New("repo is nil"))
+	}
+	if opts.email == nil {
+		errList = append(errList, errors.New("email is nil"))
+	}
+	if opts.blobstore == nil {
+		errList = append(errList, errors.New("fs is nil"))
+	}
+	if opts.fileSystem == nil {
+		errList = append(errList, errors.New("fileSystem is nil"))
+	}
+
+	if len(errList) > 0 {
+		return nil, errors.Join(errList...)
+	}
+
+	return &handler{
+		config:     opts.config,
+		kvStore:    opts.kvStore,
+		repo:       opts.repo,
+		email:      opts.email,
+		blobstore:  opts.blobstore,
+		fileSystem: opts.fileSystem,
+	}, nil
 }
 
 // bindAndValidate binds path params, query params and the request body into provided type `i` and validates provided `i`. The default binder binds body based on Content-Type header. Validator must be registered using `Echo#Validator`.
@@ -59,7 +121,7 @@ func bindAndValidate(c echo.Context, i any) error {
 	return err
 }
 
-func SanitizeEmail(email string) string {
+func sanitizeEmail(email string) string {
 	emailParts := strings.Split(email, "@")
 	username := emailParts[0]
 	domain := emailParts[1]

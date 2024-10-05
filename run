@@ -1,0 +1,207 @@
+#!/usr/bin/env bash
+
+set -e
+
+ENV_FILE="${ENV_FILE:-".env"}"
+
+if [[ -r $ENV_FILE ]]; then
+    # shellcheck disable=SC1090
+    source "$ENV_FILE"
+fi
+
+PACKAGE_NAME=$(awk '/^module/ { print $2 }' go.mod)
+APP_NAME=$(awk -F '/' '{print $3}' <<<"$PACKAGE_NAME")
+APP_VERSION=$(git describe --tags --always)
+GO_VERSION=$(awk '/^go/ { print $2 }' go.mod)
+IMAGE_OS_NAME=${IMAGE_OS_NAME:-"alpine"}
+IMAGE_OS_VERSION=${IMAGE_OS_VERSION:-"3.19"}
+SECRETS_FILE=${SECRETS_FILE:-"secrets.json"}
+
+export ENV_FILE GO_VERSION IMAGE_OS_NAME IMAGE_OS_VERSION SECRETS_FILE
+
+prompt() {
+    read -p "$1 [y/n]: " -s -n 1 -r res
+    echo
+    [[ "$res" =~ ^[Yy]$ ]]
+}
+
+print_colored() {
+    local text="$2"
+    local -A colors=(["grey"]="90" ["red"]="91" ["green"]="92" ["yellow"]="93" ["blue"]="94" ["magenta"]="95" ["cyan"]="96" ["white"]="97")
+    printf "\x1b[%sm%s\x1b[0m\n" "${colors[$1]:-0}" "$text"
+}
+
+print_menu() {
+    local -a tasks
+    while read -r n task_name; do
+        task_name=$(echo "$task_name" | sed 's/task_//; s/() {//')
+        task_desc=$(awk "NR==$((n - 1))" "$0")
+        tasks+=("$(printf "%-16s - %s\n" "$task_name" "${task_desc:1}")")
+    done <<<"$(awk '/^task_/ { print NR, $0 }' "$0")"
+
+    mapfile -t tasks < <(printf "%s\n" "${tasks[@]}" | sort)
+
+    print_colored magenta "Available tasks"
+    for task in "${tasks[@]}"; do
+        echo "> $task"
+    done
+    print_colored blue "Usage: $0 <task>"
+}
+
+# Initialize the project
+task_init() {
+    if [[ ! "$(command -v go)" ]]; then
+        print_colored red "Go is not installed. Please install Go first."
+        return 1
+    fi
+    if [[ ! "$(command -v air)" ]]; then
+        print_colored blue "Installing air..."
+        if go install github.com/air-verse/air@latest; then
+            print_colored green "air installed successfully ✔"
+        else
+            print_colored red "Failed to install air"
+            exit 1
+        fi
+    fi
+    if [[ ! "$(command -v swag)" ]]; then
+        print_colored blue "Installing swag..."
+        if go install github.com/swaggo/swag/cmd/swag@latest; then
+            print_colored green "swag installed successfully ✔"
+        else
+            print_colored red "Failed to install swag"
+            exit 1
+        fi
+    fi
+    go mod download
+}
+
+# Run live development server in docker
+task_docker_watch() {
+    local compose_file="docker-compose.yaml"
+    docker compose -f "$compose_file" down --remove-orphans
+    docker compose -f "$compose_file" up --build
+}
+
+# Build docker image for production release
+task_docker_build() {
+    local tag="${1:-"$APP_NAME:$APP_VERSION"}"
+    docker build --tag "$tag" --target production --platform linux/amd64 \
+        --build-arg GO_VERSION="$GO_VERSION" \
+        --build-arg IMAGE_OS_NAME="$IMAGE_OS_NAME" \
+        --build-arg IMAGE_OS_VERSION="$IMAGE_OS_VERSION" \
+        .
+}
+
+# Push production docker image to registry
+task_docker_push() {
+    local tag="${1:-"$APP_NAME:$APP_VERSION"}"
+    local repo_name
+    repo_name=$(echo "$tag" | cut -d ':' -f 1)
+
+    docker login --username "$DOCKERHUB_USERNAME" --password "$DOCKERHUB_PASSWORD"
+
+    docker push "${1:-$tag}"
+    # Tag and push image as latest
+    docker tag "$tag" "$repo_name:latest"
+    docker push "$repo_name:latest"
+}
+
+# Run live development server
+task_watch() {
+    local tmp_dir=".tmp"
+    local build_cmd="go build --ldflags=\"-X $PACKAGE_NAME/internal/config.BuildId=$APP_NAME.$APP_VERSION.debug\" --race -o $tmp_dir/main  ."
+    # build.kill_delay is in nanoseconds
+    air --tmp_dir="$tmp_dir" --build.cmd "$build_cmd" --build.bin "$tmp_dir/main" --build.delay 0 --build.kill_delay 10000000000 \
+        --build.include_ext "go,tmpl,env" --build.send_interrupt true --log.main_only true
+}
+
+readonly build_path="./bin/main"
+
+# Build go app for production release and generate swagger docs
+task_build() {
+    print_colored blue "Building app..."
+    swag init -g internal/handler/router.go
+
+    local build_cmd="CGO_ENABLED=0 go build --ldflags=\"-s -w -X $PACKAGE_NAME/internal/config.BuildId=$APP_NAME.$APP_VERSION.release -extldflags=-static\" \
+        --trimpath --buildmode=pie --pgo default.pgo -o $build_path ."
+
+    if ! eval "$build_cmd"; then
+        print_colored red "Build failed"
+        return 1
+    fi
+    print_colored green "Build successful ✔"
+
+}
+
+# Run go app build
+task_start() {
+    if [[ ! -x "$build_path" ]]; then
+        print_colored red "Build not found."
+        return 1
+    fi
+    print_colored blue "Starting app..."
+    "$build_path"
+}
+
+# Run tests
+task_test() {
+    go test --race --count=2 -v ./...
+}
+
+# Run tests and show coverage
+task_test_cover() {
+    go test --race --coverprofile=./tmp/coverage.out ./... && go tool cover --html=./tmp/coverage.out
+}
+
+# Run benchmarks
+task_benchmark() {
+    go test --race --count=2 -v --benchmem --bench=. ./...
+}
+
+# Clean go mod & cache & remove build artifacts
+task_clean() {
+    print_colored blue "Cleaning up..."
+    go mod tidy -v
+    go clean --cache
+    rm -rf ./bin ./.tmp
+    print_colored green "Cleaned up successfully ✔"
+}
+
+# Generate pprof profile
+task_pprof() {
+    print_colored blue "Generating pprof profile..."
+    curl "http://localhost:${PORT:-"8080"}/debug/pprof/profile?seconds=30" >default.pgo && print_colored green "Generated pprof profile successfully ✔"
+}
+
+# Create a git checkpoint and push to origin
+task_checkpoint() {
+    if ! prompt "Create git checkpoint and push to origin?"; then
+        print_colored magenta "Quitting..."
+        return 1
+    fi
+
+    print_colored blue "Creating checkpoint..."
+
+    if git add . && git commit -m "Checkpoint at $(date '+%Y-%m-%dT%H:%M:%S%z')" && git push; then
+        print_colored green "Created checkpoint and pushed to origin ✔"
+        return 0
+    fi
+
+    print_colored red "Failed to create checkpoint"
+}
+
+# Upgrade dependencies
+task_upgrade_deps() {
+    print_colored blue "Upgrading dependencies..."
+    if go get -u ./...; then
+        print_colored green "Upgraded dependencies successfully ✔"
+        return 0
+    fi
+    print_colored red "Failed to upgrade dependencies"
+}
+
+if [[ -z "$(declare -F "task_$1")" ]]; then
+    print_menu
+else
+    "task_$*"
+fi

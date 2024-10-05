@@ -1,19 +1,19 @@
 # Golang API starter
 
-<img src="./web/images/go-fast.png" alt="Gopher running fast" height="128" width="128"/>
+<img src="./web/images/go-fast.png" alt="Gopher flash" height="128" width="128"/>
 
 ## Development
 
-Initialize the project:
+Initialize the project after cloning the repository:
 
 ```bash
-./tasks init
+./run init
 ```
 
 Run the development server:
 
 ```bash
-./tasks watch # or ./tasks docker-watch
+./run watch # or ./run docker-watch
 ```
 
 ## Production
@@ -21,15 +21,15 @@ Run the development server:
 Build the project:
 
 ```bash
-./tasks build
+./run build
 ```
 
 Run the production server:
 
 ```bash
-./tasks start
+./run start
 ```
 
 ## Notes
 
-- The `tasks` script is used to automate common development/production tasks. Run `./tasks` to see the available tasks.
+- The `run` script is used to automate common development/production tasks. Run `./run` to see the available tasks.

@@ -23,16 +23,16 @@ var (
 func EncryptAES(data []byte, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher([]byte(key))
 	if err != nil {
-		return nil, errors.Join(errors.New("could not create cipher block"), err)
+		return nil, fmt.Errorf("could not create cipher block: %w", err)
 	}
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, errors.Join(errors.New("could not create GCM"), err)
+		return nil, fmt.Errorf("could not create GCM: %w", err)
 	}
 	nonce := make([]byte, gcm.NonceSize())
 	_, err = rand.Read(nonce)
 	if err != nil {
-		return nil, errors.Join(errors.New("could not create nonce"), err)
+		return nil, fmt.Errorf("could not create nonce: %w", err)
 	}
 	//Append cipher to nonce and return nonce + cipher
 	return gcm.Seal(nonce, nonce, data, nil), nil
@@ -42,12 +42,12 @@ func EncryptAES(data []byte, key []byte) ([]byte, error) {
 func DecryptAES(encryptedData []byte, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher([]byte(key))
 	if err != nil {
-		return nil, errors.Join(errors.New("could not create cipher block"), err)
+		return nil, fmt.Errorf("could not create cipher block: %w", err)
 	}
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, errors.Join(errors.New("could not create GCM"), err)
+		return nil, fmt.Errorf("could not create GCM: %w", err)
 	}
 	nonceSize := gcm.NonceSize()
 
@@ -55,7 +55,7 @@ func DecryptAES(encryptedData []byte, key []byte) ([]byte, error) {
 	nonce, cipher := encryptedData[:nonceSize], encryptedData[nonceSize:]
 	data, err := gcm.Open(nil, nonce, cipher, nil)
 	if err != nil {
-		return nil, errors.Join(errors.New("could not decrypt"), err)
+		return nil, fmt.Errorf("could not decrypt: %w", err)
 	}
 	return data, nil
 }

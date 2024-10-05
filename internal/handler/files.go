@@ -15,7 +15,7 @@ func (h *handler) GetFile(c echo.Context) error {
 	if err := bindAndValidate(c, req); err != nil {
 		return err
 	}
-	presignedReq, err := h.fs.PresignGetObject(c.Request().Context(), h.config.S3BucketName, req.FileName)
+	presignedReq, err := h.blobstore.PresignGetObject(c.Request().Context(), h.config.S3BucketName, req.FileName)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}
@@ -52,7 +52,7 @@ func (h *handler) PutFile(c echo.Context) error {
 }
 
 func (h *handler) GetFileList(c echo.Context) error {
-	files, err := h.fs.GetList(c.Request().Context(), h.config.S3BucketName, "")
+	files, err := h.blobstore.GetList(c.Request().Context(), h.config.S3BucketName, "")
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
 	}

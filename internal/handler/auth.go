@@ -63,7 +63,7 @@ func (h *handler) LogIn(c echo.Context) error {
 	if err := bindAndValidate(c, req); err != nil {
 		return err
 	}
-	user, err := h.repo.GetUserByEmail(c.Request().Context(), SanitizeEmail(req.Email))
+	user, err := h.repo.GetUserByEmail(c.Request().Context(), sanitizeEmail(req.Email))
 	if err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func (h *handler) SignUp(c echo.Context) error {
 		return err
 	}
 	user := &repo.UserCore{
-		Email:        SanitizeEmail(req.Email),
+		Email:        sanitizeEmail(req.Email),
 		PasswordHash: string(passwordHash),
 	}
 	userId, err := h.repo.CreateUser(c.Request().Context(), user)

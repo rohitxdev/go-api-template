@@ -1,45 +1,45 @@
 # syntax=docker/dockerfile:1
 # https://docs.docker.com/go/dockerfile-reference/
 
-ARG GO_VERSION=1.23
-ARG IMAGE_OS=alpine
-ARG IMAGE_OS_VERSION=3.19
-ARG TARGETARCH
-ARG TARGETOS
+ARG GO_VERSION
+ARG IMAGE_OS_NAME
+ARG IMAGE_OS_VERSION
 
 
 # Development image
-FROM golang:$GO_VERSION AS development
+FROM golang:${GO_VERSION} AS development
 
 WORKDIR /app
 
-COPY go.mod go.sum tasks ./
+COPY go.mod go.sum run .git ./
 
-RUN  ./tasks init
+RUN ./run init
 
-CMD ["./tasks","watch"]
+ENTRYPOINT ["./run","watch"]
 
 
 # Production builder image
-FROM --platform=$BUILDPLATFORM golang:$GO_VERSION-$IMAGE_OS$IMAGE_OS_VERSION AS builder
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION}-${IMAGE_OS_NAME}${IMAGE_OS_VERSION} AS builder
 
 WORKDIR /app
 
 RUN apk add git && apk add bash
 
-COPY go.mod go.sum ./
+COPY go.mod go.sum run .git ./
 
-RUN go mod download
+RUN ./run init
 
 COPY . .
 
-RUN GOARCH=$TARGETARCH GOOS=$TARGETOS ./tasks init && ./tasks build
+RUN ./run build
 
 
 # Production image
-FROM --platform=$BUILDPLATFORM $IMAGE_OS:$IMAGE_OS_VERSION AS production
+FROM --platform=${BUILDPLATFORM} ${IMAGE_OS_NAME}:${IMAGE_OS_VERSION} AS production
 
-COPY --from=builder /app/bin/build /app/build
+WORKDIR /app
+
+COPY --from=builder /app/bin/main /app/bin/main
 
 # Create a non-privileged user that the app will run under.
 # See https://docs.docker.com/go/dockerfile-user-best-practices/
@@ -56,6 +56,4 @@ RUN adduser \
 
 USER non_root_user
 
-EXPOSE 8080
-
-CMD ["/app/build"]
+ENTRYPOINT ["/app/bin/main"]
