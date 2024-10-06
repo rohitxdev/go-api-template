@@ -220,7 +220,9 @@ func New(h *handler) (*echo.Echo, error) {
 
 	// Routes
 
-	e.GET("/swagger/*", echoSwagger.EchoWrapHandler(func(c *echoSwagger.Config) { c.SyntaxHighlight = true }))
+	e.GET("/swagger/*", echoSwagger.EchoWrapHandler(func(c *echoSwagger.Config) {
+		c.SyntaxHighlight = true
+	}))
 
 	e.GET("/", func(c echo.Context) error {
 		data := echo.Map{
