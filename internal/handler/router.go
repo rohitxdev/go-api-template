@@ -13,6 +13,7 @@ import (
 	"github.com/go-playground/validator"
 	"github.com/goccy/go-json"
 	"github.com/gorilla/sessions"
+	"github.com/labstack/echo-contrib/echoprometheus"
 	"github.com/labstack/echo-contrib/pprof"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
@@ -140,7 +141,7 @@ func New(h *handler) (*echo.Echo, error) {
 	// Gzip compression & decompression
 
 	e.Use(middleware.GzipWithConfig(middleware.GzipConfig{Skipper: func(c echo.Context) bool {
-		return !strings.Contains(c.Request().Header.Get("Accept-Encoding"), "gzip")
+		return !strings.Contains(c.Request().Header.Get("Accept-Encoding"), "gzip") || strings.HasPrefix(c.Path(), "/metrics")
 	}}))
 
 	e.Pre(middleware.Decompress())
@@ -158,6 +159,12 @@ func New(h *handler) (*echo.Echo, error) {
 			return nil
 		}},
 	))
+
+	e.Pre(middleware.RemoveTrailingSlash())
+
+	// Prometheus metrics
+	e.Use(echoprometheus.NewMiddleware("api"))
+	e.GET("/metrics", echoprometheus.NewHandler())
 
 	host, err := os.Hostname()
 	if err != nil {
@@ -221,7 +228,7 @@ func New(h *handler) (*echo.Echo, error) {
 			"env":     h.config.Env,
 			"host":    host,
 		}
-		switch c.Request().Header.Get("Accept") {
+		switch accepts(c) {
 		case "text/html":
 			return c.Render(http.StatusOK, "home.tmpl", data)
 		default:

@@ -3,21 +3,16 @@
 set -e
 
 ENV_FILE="${ENV_FILE:-".env"}"
-
-if [[ -r $ENV_FILE ]]; then
-    # shellcheck disable=SC1090
-    source "$ENV_FILE"
-fi
+# shellcheck disable=SC1090
+[[ -r $ENV_FILE ]] && source "$ENV_FILE"
 
 PACKAGE_NAME=$(awk '/^module/ { print $2 }' go.mod)
 APP_NAME=$(awk -F '/' '{print $3}' <<<"$PACKAGE_NAME")
-APP_VERSION=$(git describe --tags --always)
+APP_VERSION="${APP_VERSION:-"$(git describe --tags --always --dirty)"}"
 GO_VERSION=$(awk '/^go/ { print $2 }' go.mod)
-IMAGE_OS_NAME=${IMAGE_OS_NAME:-"alpine"}
-IMAGE_OS_VERSION=${IMAGE_OS_VERSION:-"3.19"}
 SECRETS_FILE=${SECRETS_FILE:-"secrets.json"}
 
-export ENV_FILE GO_VERSION IMAGE_OS_NAME IMAGE_OS_VERSION SECRETS_FILE
+export ENV_FILE APP_NAME GO_VERSION SECRETS_FILE
 
 prompt() {
     read -p "$1 [y/n]: " -s -n 1 -r res
@@ -43,43 +38,22 @@ print_menu() {
 
     print_colored magenta "Available tasks"
     for task in "${tasks[@]}"; do
-        echo "> $task"
+        echo "➤ $task"
     done
     print_colored blue "Usage: $0 <task>"
-}
-
-# Initialize the project
-task_init() {
-    if [[ ! "$(command -v go)" ]]; then
-        print_colored red "Go is not installed. Please install Go first."
-        return 1
-    fi
-    if [[ ! "$(command -v air)" ]]; then
-        print_colored blue "Installing air..."
-        if go install github.com/air-verse/air@latest; then
-            print_colored green "air installed successfully ✔"
-        else
-            print_colored red "Failed to install air"
-            exit 1
-        fi
-    fi
-    if [[ ! "$(command -v swag)" ]]; then
-        print_colored blue "Installing swag..."
-        if go install github.com/swaggo/swag/cmd/swag@latest; then
-            print_colored green "swag installed successfully ✔"
-        else
-            print_colored red "Failed to install swag"
-            exit 1
-        fi
-    fi
-    go mod download
 }
 
 # Run live development server in docker
 task_docker_watch() {
     local compose_file="docker-compose.yaml"
     docker compose -f "$compose_file" down --remove-orphans
-    docker compose -f "$compose_file" up --build
+    local tag="$APP_NAME-dev"
+    docker rmi "$tag"
+    docker build --tag "$tag" --target development \
+        --build-arg GO_VERSION="$GO_VERSION" \
+        --build-arg APP_VERSION="$APP_VERSION" \
+        .
+    docker compose -f "$compose_file" up
 }
 
 # Build docker image for production release
@@ -87,8 +61,7 @@ task_docker_build() {
     local tag="${1:-"$APP_NAME:$APP_VERSION"}"
     docker build --tag "$tag" --target production --platform linux/amd64 \
         --build-arg GO_VERSION="$GO_VERSION" \
-        --build-arg IMAGE_OS_NAME="$IMAGE_OS_NAME" \
-        --build-arg IMAGE_OS_VERSION="$IMAGE_OS_VERSION" \
+        --build-arg APP_VERSION="$APP_VERSION" \
         .
 }
 
@@ -109,7 +82,7 @@ task_docker_push() {
 # Run live development server
 task_watch() {
     local tmp_dir=".tmp"
-    local build_cmd="go build --ldflags=\"-X $PACKAGE_NAME/internal/config.BuildId=$APP_NAME.$APP_VERSION.debug\" --race -o $tmp_dir/main  ."
+    local build_cmd="go build --ldflags=\"-X $PACKAGE_NAME/internal/config.BuildId=$APP_NAME.$APP_VERSION-dev\" --race -o $tmp_dir/main  ."
     # build.kill_delay is in nanoseconds
     air --tmp_dir="$tmp_dir" --build.cmd "$build_cmd" --build.bin "$tmp_dir/main" --build.delay 0 --build.kill_delay 10000000000 \
         --build.include_ext "go,tmpl,env" --build.send_interrupt true --log.main_only true
@@ -122,14 +95,16 @@ task_build() {
     print_colored blue "Building app..."
     swag init -g internal/handler/router.go
 
-    local build_cmd="CGO_ENABLED=0 go build --ldflags=\"-s -w -X $PACKAGE_NAME/internal/config.BuildId=$APP_NAME.$APP_VERSION.release -extldflags=-static\" \
+    local build_id="$APP_NAME.$APP_VERSION"
+
+    local build_cmd="CGO_ENABLED=0 go build --ldflags=\"-s -w -X $PACKAGE_NAME/internal/config.BuildId=$build_id -extldflags=-static\" \
         --trimpath --buildmode=pie --pgo default.pgo -o $build_path ."
 
     if ! eval "$build_cmd"; then
         print_colored red "Build failed"
         return 1
     fi
-    print_colored green "Build successful ✔"
+    print_colored green "Build successful ✔ $(print_colored grey "($build_id)")"
 
 }
 

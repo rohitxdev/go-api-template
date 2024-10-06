@@ -1,12 +1,6 @@
 services:
   api:
-    build:
-      context: .
-      target: development
-      args:
-        GO_VERSION: ${GO_VERSION}
-        IMAGE_OS_NAME: ${IMAGE_OS_NAME}
-        IMAGE_OS_VERSION: ${IMAGE_OS_VERSION}
+    image: ${APP_NAME}-dev
     volumes:
       - .:/app
     ports:

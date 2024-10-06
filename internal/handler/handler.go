@@ -132,3 +132,8 @@ func sanitizeEmail(email string) string {
 	username = strings.ReplaceAll(username, ".", "")
 	return username + "@" + domain
 }
+
+func accepts(c echo.Context) string {
+	acceptedTypes := strings.Split(c.Request().Header.Get("Accept"), ",")
+	return acceptedTypes[0]
+}

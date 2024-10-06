@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1
 # https://docs.docker.com/go/dockerfile-reference/
 
-ARG GO_VERSION
-ARG IMAGE_OS_NAME
-ARG IMAGE_OS_VERSION
+ARG GO_VERSION=1.23
+ARG IMAGE_OS_NAME=alpine
+ARG IMAGE_OS_VERSION=3.20
 
 
 # Development image
@@ -11,23 +11,27 @@ FROM golang:${GO_VERSION} AS development
 
 WORKDIR /app
 
-COPY go.mod go.sum run .git ./
+RUN go install github.com/air-verse/air@latest && go install github.com/swaggo/swag/cmd/swag@latest
 
-RUN ./run init
+COPY go.mod go.sum ./
+
+RUN go mod download
 
 ENTRYPOINT ["./run","watch"]
 
 
 # Production builder image
-FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION}-${IMAGE_OS_NAME}${IMAGE_OS_VERSION} AS builder
+FROM golang:${GO_VERSION}-${IMAGE_OS_NAME}${IMAGE_OS_VERSION} AS builder
 
 WORKDIR /app
 
 RUN apk add git && apk add bash
 
-COPY go.mod go.sum run .git ./
+RUN go install github.com/air-verse/air@latest && go install github.com/swaggo/swag/cmd/swag@latest
 
-RUN ./run init
+COPY go.mod go.sum ./
+
+RUN go mod download
 
 COPY . .
 
@@ -35,11 +39,11 @@ RUN ./run build
 
 
 # Production image
-FROM --platform=${BUILDPLATFORM} ${IMAGE_OS_NAME}:${IMAGE_OS_VERSION} AS production
+FROM ${IMAGE_OS_NAME}:${IMAGE_OS_VERSION} AS production
 
 WORKDIR /app
 
-COPY --from=builder /app/bin/main /app/bin/main
+COPY --from=builder /app/bin/main ./bin/main
 
 # Create a non-privileged user that the app will run under.
 # See https://docs.docker.com/go/dockerfile-user-best-practices/
@@ -56,4 +60,4 @@ RUN adduser \
 
 USER non_root_user
 
-ENTRYPOINT ["/app/bin/main"]
+ENTRYPOINT ["./bin/main"]
