@@ -4,7 +4,6 @@ import (
 	"context"
 	"embed"
 	"errors"
-	"flag"
 	"fmt"
 	"log/slog"
 	"net"
@@ -30,10 +29,7 @@ var fileSystem embed.FS
 
 func main() {
 	//Load config
-	envFile := flag.String("env-file", ".env", "Path to .env file")
-	flag.Parse()
-
-	c, err := config.Load(*envFile)
+	c, err := config.Load()
 	if err != nil {
 		panic("load config: " + err.Error())
 	}
@@ -58,7 +54,7 @@ func main() {
 
 	slog.SetDefault(slog.New(logHandler))
 
-	slog.Debug(fmt.Sprintf("Running %s on %s in %s environment", c.BuildId, runtime.GOOS+"/"+runtime.GOARCH, c.Env))
+	slog.Debug(fmt.Sprintf("Running %s on %s in %s environment", config.BuildId, runtime.GOOS+"/"+runtime.GOARCH, c.Env))
 
 	//Connect to postgres database
 	db, err := database.NewPostgres(c.DatabaseUrl)

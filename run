@@ -85,7 +85,7 @@ task_watch() {
     local build_cmd="go build --ldflags=\"-X $PACKAGE_NAME/internal/config.BuildId=$APP_NAME.$APP_VERSION-dev\" --race -o $tmp_dir/main  ."
     # build.kill_delay is in nanoseconds
     air --tmp_dir="$tmp_dir" --build.cmd "$build_cmd" --build.bin "$tmp_dir/main" --build.delay 0 --build.kill_delay 10000000000 \
-        --build.include_ext "go,tmpl,env" --build.send_interrupt true --log.main_only true
+        --build.include_ext "go,tmpl,env,json" --build.send_interrupt true --log.main_only true
 }
 
 readonly build_path="./bin/main"
@@ -107,6 +107,8 @@ task_build() {
     print_colored green "Build successful ✔ $(print_colored grey "($build_id)")"
 
 }
+
+echo "$A"
 
 # Run go app build
 task_start() {
