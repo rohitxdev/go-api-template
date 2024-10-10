@@ -22,7 +22,7 @@ prompt() {
     [[ "$res" =~ ^[Yy]$ ]]
 }
 
-color_print() {
+print_color() {
     local text="$2"
     local -A colors=(["grey"]="30" ["red"]="31" ["green"]="32" ["yellow"]="33" ["blue"]="34" ["magenta"]="35" ["cyan"]="36" ["white"]="37")
     if tput colors &>/dev/null; then
@@ -42,11 +42,11 @@ print_menu() {
 
     mapfile -t tasks < <(printf "%s\n" "${tasks[@]}" | sort)
 
-    color_print magenta "Available tasks"
+    print_color magenta "Available tasks"
     for task in "${tasks[@]}"; do
         echo "➤ $task"
     done
-    color_print blue "Usage: $0 <task>"
+    print_color blue "Usage: $0 <task>"
 }
 
 # Run live development server in docker
@@ -72,7 +72,7 @@ task_docker_build() {
 # Push production docker image to registry
 task_docker_push() {
     if grep "dirty" <<<"$tag"; then
-        color_print red "ERROR: Tag is dirty. Please commit changes and re-run task."
+        print_color red "ERROR: Tag is dirty. Please commit changes and re-run task."
         return 1
     fi
     docker login --username "$DOCKERHUB_USERNAME" --password "$DOCKERHUB_PASSWORD"
@@ -104,22 +104,21 @@ task_build() {
         --trimpath -o $build_path ."
 
     if ! eval "$build_cmd"; then
-        color_print red "Build failed"
+        print_color red "Build failed"
         return 1
     fi
-
     if file "$build_path" | grep "dynamically linked" >/dev/null; then
-        color_print red "ERROR: Binary is still dynamically linked."
+        print_color red "ERROR: Binary is still dynamically linked."
         file "$build_path"
         return 1
     fi
-    color_print green "Build successful ✔ $(color_print grey "($build_id)")"
+    print_color green "Build successful ✔ $(print_color grey "($build_id)")"
 }
 
 # Run go app build
 task_start() {
     if [[ ! -x "$build_path" ]]; then
-        color_print red "Build not found."
+        print_color red "Build not found."
         return 1
     fi
     "$build_path"
@@ -145,35 +144,35 @@ task_clean() {
     go mod tidy -v
     go clean --cache
     rm -rf ./bin ./.tmp
-    color_print green "Cleaned up successfully ✔"
+    print_color green "Cleaned up successfully ✔"
 }
 
 # Generate pprof profile
 task_pprof() {
-    curl "http://localhost:${PORT:-"8080"}/debug/pprof/profile?seconds=30" >default.pgo && color_print green "Generated pprof profile successfully ✔"
+    curl "http://localhost:${PORT:-"8080"}/debug/pprof/profile?seconds=30" >default.pgo && print_color green "Pprof profile generated successfully ✔"
 }
 
 # Create a git checkpoint and push to origin
 task_checkpoint() {
     if ! prompt "Create git checkpoint and push changes to origin?"; then
-        color_print magenta "Quitting..."
+        print_color magenta "Quitting..."
         return 1
     fi
     if git add . && git commit -m "Checkpoint at $(date '+%Y-%m-%dT%H:%M:%S%z')" && git push; then
-        color_print green "Created checkpoint successfully ✔"
+        print_color green "Checkpoint created successfully ✔"
         return 0
     fi
-    color_print red "Failed to create checkpoint"
+    print_color red "Failed to create checkpoint"
 }
 
 # Upgrade dependencies
 task_upgrade_deps() {
     if go get -u ./...; then
-        color_print green "Upgraded minor/patch versions of packages successfully ✔"
+        print_color green "Upgraded minor/patch versions of packages successfully ✔"
         echo "To upgrade major versions, you have to run 'go get -u <package>@<version>' for each package manually"
         return 0
     fi
-    color_print red "Failed to upgrade packages"
+    print_color red "Failed to upgrade packages"
 }
 
 if [[ -z "$(declare -F "task_$1")" ]]; then
