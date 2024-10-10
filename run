@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 set -e
-
 set -o allexport
 
 ENV_FILE="${ENV_FILE:-".env"}"
@@ -65,21 +64,21 @@ task_docker_build() {
     if docker images | grep "$repository:$tag"; then
         docker rmi "$repository:$tag" --force
     fi
-    docker build --tag "$repository:$tag" --target production --platform linux/amd64 --build-arg BASE_IMAGE_TAG="$BASE_IMAGE_TAG" \
-        --cache-from type=registry,ref="$repository" --cache-to type=registry,ref="$repository,mode=max,ignore-error=true" .
+    docker build --tag "$repository:$tag" --target production --platform linux/amd64 --build-arg BASE_IMAGE_TAG="$BASE_IMAGE_TAG" .
     echo -e "\n➤ Image: $repository:$tag"
 }
 
 # Push production docker image to registry
 task_docker_push() {
-    if grep "dirty" <<<"$tag"; then
+    if echo "$tag" | grep "dirty"; then
         print_color red "Image tag is dirty. Please commit the changes and re-build the image. Quitting..."
         return 1
     fi
-    docker login --username "$DOCKERHUB_USERNAME" --password "$DOCKERHUB_PASSWORD"
-    docker push "$repository:$tag"
-    # Tag and push image as latest
+    if [[ -n "$DOCKERHUB_USERNAME" && -n "$DOCKERHUB_PASSWORD" ]]; then
+        docker login --username "$DOCKERHUB_USERNAME" --password "$DOCKERHUB_PASSWORD"
+    fi
     docker tag "$repository:$tag" "$repository:latest"
+    docker push "$repository:$tag"
     docker push "$repository:latest"
     echo -e "\nThe following images were pushed to registry:
     - $repository:$tag
@@ -107,6 +106,8 @@ task_build() {
     local build_cmd="CGO_ENABLED=0 go build \
         -ldflags='-s -w -X $PACKAGE_NAME/internal/config.BuildId=$build_id -extldflags \"-static\"' \
         --trimpath -o $build_path ."
+
+    print_color cyan "Building app..."
 
     if go generate ./...; then
         print_color green "OpenAPI docs generated ✔"

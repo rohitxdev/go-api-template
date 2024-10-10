@@ -22,7 +22,7 @@ import (
 	"github.com/rohitxdev/go-api-starter/pkg/kvstore"
 	"github.com/rohitxdev/go-api-starter/pkg/prettylog"
 	"github.com/rohitxdev/go-api-starter/pkg/repo"
-	_ "go.uber.org/automaxprocs"
+	"go.uber.org/automaxprocs/maxprocs"
 )
 
 //go:embed web docs
@@ -60,6 +60,15 @@ func main() {
 	slog.SetDefault(slog.New(logHandler))
 
 	slog.Debug(fmt.Sprintf("Running %s on %s in %s environment", config.BuildId, runtime.GOOS+"/"+runtime.GOARCH, c.Env))
+
+	// Set maxprocs logger
+	maxprocsLogger := maxprocs.Logger(func(s string, i ...interface{}) {
+		slog.Debug(fmt.Sprintf(s, i...))
+	})
+
+	if _, err = maxprocs.Set(maxprocsLogger); err != nil {
+		panic("set maxprocs logger: " + err.Error())
+	}
 
 	//Connect to postgres database
 	db, err := database.NewPostgres(c.DatabaseUrl)

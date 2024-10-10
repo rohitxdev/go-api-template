@@ -41,9 +41,6 @@ func (h *handler) PutFile(c echo.Context) error {
 	}
 	defer f.Close()
 	// fileContent, err := io.ReadAll(f)
-	if err != nil {
-		return c.String(http.StatusInternalServerError, err.Error())
-	}
 	// err = h.fs.Upload(c.Request().Context(), h.config.S3BucketName, file.Filename, fileContent)
 	// if err != nil {
 	// 	return c.String(http.StatusInternalServerError, err.Error())
