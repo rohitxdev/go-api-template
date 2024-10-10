@@ -166,11 +166,3 @@ func (h *handler) GetConfig(c echo.Context) error {
 	}
 	return c.JSON(http.StatusOK, clientConfig)
 }
-
-// @Summary Foo
-// @Description Foo
-// @Router /foo [get]
-// @Success 200 {string} string "foo"
-func (h *handler) Foo(c echo.Context) error {
-	return c.String(http.StatusOK, "foo")
-}
