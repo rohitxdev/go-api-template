@@ -67,8 +67,7 @@ task_docker_build() {
     fi
     docker build --tag "$repository:$tag" --target production --platform linux/amd64 --build-arg BASE_IMAGE_TAG="$BASE_IMAGE_TAG" \
         --cache-from type=registry,ref="$repository" --cache-to type=registry,ref="$repository,mode=max,ignore-error=true" .
-    echo
-    print_color cyan "➤ Image: $repository:$tag"
+    echo -e "\n➤ Image: $repository:$tag"
 }
 
 # Push production docker image to registry
@@ -82,9 +81,7 @@ task_docker_push() {
     # Tag and push image as latest
     docker tag "$repository:$tag" "$repository:latest"
     docker push "$repository:latest"
-    echo
-    print_color cyan \
-        "The following images were pushed to registry:
+    echo -e "\nThe following images were pushed to registry:
     - $repository:$tag
     - $repository:latest"
 }
@@ -95,7 +92,7 @@ task_watch() {
     local build_cmd="go build --ldflags=\"-X $PACKAGE_NAME/internal/config.BuildId=$APP_NAME.$APP_VERSION-dev\" --race -o $tmp_dir/main  ."
 
     if ! command -v air &>/dev/null; then
-        print_color yellow "Installing air..."
+        print_color cyan "Installing air..."
         go install github.com/air-verse/air@latest
     fi
     # build.kill_delay is in nanoseconds
