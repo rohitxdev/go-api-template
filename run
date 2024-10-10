@@ -24,7 +24,7 @@ prompt() {
 
 print_colored() {
     local text="$2"
-    local -A colors=(["grey"]="90" ["red"]="91" ["green"]="92" ["yellow"]="93" ["blue"]="94" ["magenta"]="95" ["cyan"]="96" ["white"]="97")
+    local -A colors=(["grey"]="30" ["red"]="31" ["green"]="32" ["yellow"]="33" ["blue"]="34" ["magenta"]="35" ["cyan"]="36" ["white"]="37")
     if tput colors &>/dev/null; then
         printf "\x1b[%sm%s\x1b[0m\n" "${colors[$1]:-0}" "$text"
     else
@@ -61,7 +61,9 @@ repository="$(echo "$PACKAGE_NAME" | cut -d '/' -f 2-)"
 tag="$APP_VERSION"
 # Build docker image for release
 task_docker_build() {
-    docker rmi "$repository:$tag" --force || true
+    if docker images | grep "$repository:$tag"; then
+        docker rmi "$repository:$tag" --force
+    fi
     docker build --tag "$repository:$tag" --target production --platform linux/amd64 --build-arg BASE_IMAGE_TAG="$BASE_IMAGE_TAG" \
         --cache-from type=registry,ref="$repository" --cache-to type=registry,ref="$repository,mode=max,ignore-error=true" .
     echo -e "\n➤ Image: $repository:$tag"
