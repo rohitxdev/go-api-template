@@ -80,8 +80,8 @@ task_docker_push() {
     # Tag and push image as latest
     docker tag "$repository:$tag" "$repository:latest"
     docker push "$repository:latest"
-    echo \
-        "The following images were pushed to registry:
+    echo -e \
+        "\nThe following images were pushed to registry:
     - $repository:$tag
     - $repository:latest"
 }
@@ -158,7 +158,7 @@ task_checkpoint() {
         print_color magenta "Quitting..."
         return 1
     fi
-    if git add . && git commit -m "Checkpoint at $(date '+%Y-%m-%dT%H:%M:%S%z')" && git push; then
+    if git add . && git commit -m "Checkpoint at $(date -u)" && git push; then
         print_color green "Checkpoint created successfully ✔"
         return 0
     fi
