@@ -169,7 +169,11 @@ task_pprof() {
 # Create a git checkpoint and push to origin
 task_checkpoint() {
     if ! prompt "Create git checkpoint and push changes to origin?"; then
-        print_color magenta "Quitting..."
+        print_color cyan "Quitting..."
+        return 1
+    fi
+    if ! task_build && ! prompt "Still continue?"; then
+        print_color cyan "Quitting..."
         return 1
     fi
     if git add . && git commit -m "Checkpoint at $(date -u)" && git push; then

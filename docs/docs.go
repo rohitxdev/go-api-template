@@ -54,20 +54,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/foo": {
-            "get": {
-                "description": "Foo",
-                "summary": "Foo",
-                "responses": {
-                    "200": {
-                        "description": "foo",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
         "/ping": {
             "get": {
                 "description": "Ping the server.",

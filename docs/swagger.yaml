@@ -39,15 +39,6 @@ paths:
           schema:
             $ref: '#/definitions/config.Client'
       summary: Get config
-  /foo:
-    get:
-      description: Foo
-      responses:
-        "200":
-          description: foo
-          schema:
-            type: string
-      summary: Foo
   /ping:
     get:
       description: Ping the server.

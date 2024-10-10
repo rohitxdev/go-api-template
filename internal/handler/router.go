@@ -242,8 +242,6 @@ func New(h *handler) (*echo.Echo, error) {
 
 	e.GET("/config", h.GetConfig)
 
-	e.GET("/foo", h.Foo)
-
 	e.GET("/files/:file_name", h.GetFile)
 
 	v1 := e.Group("/v1")
