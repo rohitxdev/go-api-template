@@ -46,7 +46,7 @@ print_menu() {
     for task in "${tasks[@]}"; do
         echo "➤ $task"
     done
-    print_color blue "Usage: $0 <task>"
+    print_color cyan "Usage: $0 <task>"
 }
 
 # Run live development server in docker
@@ -58,7 +58,8 @@ task_docker_watch() {
 }
 
 repository="$(echo "$PACKAGE_NAME" | cut -d '/' -f 2-)"
-tag="$APP_VERSION"
+readonly repository
+readonly tag="$APP_VERSION"
 # Build docker image for release
 task_docker_build() {
     if docker images | grep "$repository:$tag"; then
@@ -66,13 +67,14 @@ task_docker_build() {
     fi
     docker build --tag "$repository:$tag" --target production --platform linux/amd64 --build-arg BASE_IMAGE_TAG="$BASE_IMAGE_TAG" \
         --cache-from type=registry,ref="$repository" --cache-to type=registry,ref="$repository,mode=max,ignore-error=true" .
-    echo -e "\n➤ Image: $repository:$tag"
+    echo
+    print_color cyan "➤ Image: $repository:$tag"
 }
 
 # Push production docker image to registry
 task_docker_push() {
     if grep "dirty" <<<"$tag"; then
-        print_color red "ERROR: Tag is dirty. Please commit changes and re-run task."
+        print_color red "ERROR: Tag is dirty. Please commit changes and re-build the image."
         return 1
     fi
     docker login --username "$DOCKERHUB_USERNAME" --password "$DOCKERHUB_PASSWORD"
@@ -80,8 +82,9 @@ task_docker_push() {
     # Tag and push image as latest
     docker tag "$repository:$tag" "$repository:latest"
     docker push "$repository:latest"
-    echo -e \
-        "\nThe following images were pushed to registry:
+    echo
+    print_color cyan \
+        "The following images were pushed to registry:
     - $repository:$tag
     - $repository:latest"
 }
@@ -90,6 +93,11 @@ task_docker_push() {
 task_watch() {
     local tmp_dir=".tmp"
     local build_cmd="go build --ldflags=\"-X $PACKAGE_NAME/internal/config.BuildId=$APP_NAME.$APP_VERSION-dev\" --race -o $tmp_dir/main  ."
+
+    if ! command -v air &>/dev/null; then
+        print_color yellow "Installing air..."
+        go install github.com/air-verse/air@latest
+    fi
     # build.kill_delay is in nanoseconds
     air --tmp_dir="$tmp_dir" --build.cmd "$build_cmd" --build.bin "$tmp_dir/main" --build.delay 0 --build.kill_delay 10000000000 \
         --build.include_ext "go,tmpl,env,json" --build.send_interrupt true --log.main_only true
@@ -99,19 +107,28 @@ readonly build_path="./bin/main"
 # Build go app for production release and generate OpenAPI docs
 task_build() {
     local build_id="$APP_NAME.$APP_VERSION"
-    local build_cmd="go generate ./... && CGO_ENABLED=0 go build \
+    local build_cmd="CGO_ENABLED=0 go build \
         -ldflags='-s -w -X $PACKAGE_NAME/internal/config.BuildId=$build_id -extldflags \"-static\"' \
         --trimpath -o $build_path ."
+
+    if go generate ./...; then
+        print_color green "OpenAPI docs generated ✔"
+    else
+        print_color red "Failed to generate OpenAPI docs"
+        return 1
+    fi
 
     if ! eval "$build_cmd"; then
         print_color red "Build failed"
         return 1
     fi
+
     if file "$build_path" | grep "dynamically linked" >/dev/null; then
         print_color red "ERROR: Binary is still dynamically linked."
         file "$build_path"
         return 1
     fi
+
     print_color green "Build successful ✔ $(print_color grey "($build_id)")"
 }
 

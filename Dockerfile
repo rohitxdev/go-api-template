@@ -23,8 +23,6 @@ WORKDIR /app
 
 RUN apk add --no-cache build-base bash git
 
-RUN go install github.com/swaggo/swag/cmd/swag@latest
-
 ENV GOPATH=/go
 
 RUN --mount=type=bind,source=go.sum,target=go.sum \

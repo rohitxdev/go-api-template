@@ -4,12 +4,6 @@
 
 ## Development
 
-Initialize the project after cloning the repository:
-
-```bash
-./run init
-```
-
 Run the development server:
 
 ```bash
