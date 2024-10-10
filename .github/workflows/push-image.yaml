@@ -16,14 +16,20 @@ jobs:
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
+          
       - name: Set up containerd
         uses: crazy-max/ghaction-setup-containerd@v3
+        with:
+          config-inline: |
+            [plugins."io.containerd.grpc.v1.cri"]
+              readonly = false
+              enable_namespace = true
+              snapshotter = "overlayfs"
 
       - name: Build docker image and push to registry
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
-        run: sudo systemctl status containerd && ./run docker_build && ./run docker_push
+        run: ./run docker_build && ./run docker_push
 
       
