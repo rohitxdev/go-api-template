@@ -73,7 +73,7 @@ task_docker_build() {
 # Push production docker image to registry
 task_docker_push() {
     if grep "dirty" <<<"$tag"; then
-        print_color red "ERROR: Tag is dirty. Please commit changes and re-build the image."
+        print_color red "Image tag is dirty. Please commit the changes and re-build the image. Quitting..."
         return 1
     fi
     docker login --username "$DOCKERHUB_USERNAME" --password "$DOCKERHUB_PASSWORD"
@@ -121,7 +121,7 @@ task_build() {
     fi
 
     if file "$build_path" | grep "dynamically linked" >/dev/null; then
-        print_color red "ERROR: Binary is still dynamically linked."
+        print_color red "Fatal: Binary is still dynamically linked."
         file "$build_path"
         return 1
     fi
