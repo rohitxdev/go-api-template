@@ -1,5 +1,4 @@
-# TODO: fix this workflow
-name: Push docker image to registry
+name: Build and push docker image to registry
 
 on:
   push: 
