@@ -137,3 +137,40 @@ func accepts(c echo.Context) string {
 	acceptedTypes := strings.Split(c.Request().Header.Get("Accept"), ",")
 	return acceptedTypes[0]
 }
+
+// @Summary Ping
+// @Description Ping the server.
+// @Router /ping [get]
+// @Success 200 {string} string "pong"
+func (h *handler) Ping(c echo.Context) error {
+	return c.String(http.StatusOK, "pong")
+}
+
+// @Summary Admin route
+// @Description Admin route.
+// @Security ApiKeyAuth
+// @Router /_ [get]
+// @Success 200 {string} string "Hello, Admin!"
+// @Failure 401 {string} string "invalid session"
+func (h *handler) AdminRoute(c echo.Context) error {
+	return c.String(http.StatusOK, "Hello, Admin!")
+}
+
+// @Summary Get config
+// @Description Get client config.
+// @Router /config [get]
+// @Success 200 {object} config.Client
+func (h *handler) GetConfig(c echo.Context) error {
+	clientConfig := config.Client{
+		Env: h.config.Env,
+	}
+	return c.JSON(http.StatusOK, clientConfig)
+}
+
+// @Summary Foo
+// @Description Foo
+// @Router /foo [get]
+// @Success 200 {string} string "foo"
+func (h *handler) Foo(c echo.Context) error {
+	return c.String(http.StatusOK, "foo")
+}

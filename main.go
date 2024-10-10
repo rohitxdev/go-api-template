@@ -1,3 +1,4 @@
+//go:generate swag init -q -g internal/handler/router.go
 package main
 
 import (
@@ -24,10 +25,14 @@ import (
 	_ "go.uber.org/automaxprocs"
 )
 
-//go:embed web
+//go:embed web docs
 var fileSystem embed.FS
 
 func main() {
+	if config.BuildId == "" {
+		panic("build id is not set")
+	}
+
 	//Load config
 	c, err := config.Load()
 	if err != nil {
@@ -65,9 +70,9 @@ func main() {
 		if err = db.Close(); err != nil {
 			panic("close database: " + err.Error())
 		}
-		slog.Debug("Database connection closed ✔︎")
+		slog.Debug("Database connection closed")
 	}()
-	slog.Debug("Connected to database ✔︎")
+	slog.Debug("Connected to database")
 
 	//Connect to sqlite database
 	sqliteDb, err := database.NewSqlite(":memory:")
@@ -82,9 +87,9 @@ func main() {
 	}
 	defer func() {
 		kv.Close()
-		slog.Debug("KV store closed ✔︎")
+		slog.Debug("KV store closed")
 	}()
-	slog.Debug("Connected to kv store ✔︎")
+	slog.Debug("Connected to kv store")
 
 	//Create API handler
 	r := repo.New(db)
@@ -120,9 +125,9 @@ func main() {
 		if err = ls.Close(); err != nil {
 			panic("close tcp listener: " + err.Error())
 		}
-		slog.Debug("TCP listener closed ✔︎")
+		slog.Debug("TCP listener closed")
 	}()
-	slog.Debug("TCP listener created ✔︎")
+	slog.Debug("TCP listener created")
 
 	go func() {
 		if err := http.Serve(ls, e); err != nil && !errors.Is(err, net.ErrClosed) {
@@ -130,8 +135,8 @@ func main() {
 		}
 	}()
 
-	slog.Debug("HTTP server started ✔︎")
-	slog.Info(fmt.Sprintf("Server is listening to http://%s and is ready to serve requests ✔︎", ls.Addr()))
+	slog.Debug("HTTP server started")
+	slog.Info(fmt.Sprintf("Server is listening to http://%s and is ready to serve requests", ls.Addr()))
 
 	//Shut down http server gracefully
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -146,5 +151,5 @@ func main() {
 		panic("http server shutdown: " + err.Error())
 	}
 
-	slog.Debug("Shut down http server gracefully ✔︎")
+	slog.Debug("Shut down http server gracefully")
 }

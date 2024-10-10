@@ -7,12 +7,12 @@ ENV_FILE="${ENV_FILE:-".env"}"
 [[ -r $ENV_FILE ]] && source "$ENV_FILE"
 
 PACKAGE_NAME=$(awk '/^module/ { print $2 }' go.mod)
-APP_NAME=$(awk -F '/' '{print $3}' <<<"$PACKAGE_NAME")
-APP_VERSION="${APP_VERSION:-"$(git describe --tags --always --dirty)"}"
+APP_NAME="$(echo "$PACKAGE_NAME" | cut -d '/' -f 3)"
+APP_VERSION="$(git describe --tags --always --dirty)"
 GO_VERSION=$(awk '/^go/ { print $2 }' go.mod)
-SECRETS_FILE=${SECRETS_FILE:-"secrets.json"}
+BASE_IMAGE_TAG=":$GO_VERSION-alpine3.20"
 
-export ENV_FILE APP_NAME GO_VERSION SECRETS_FILE
+export BASE_IMAGE_TAG
 
 prompt() {
     read -p "$1 [y/n]: " -s -n 1 -r res
@@ -23,7 +23,11 @@ prompt() {
 print_colored() {
     local text="$2"
     local -A colors=(["grey"]="90" ["red"]="91" ["green"]="92" ["yellow"]="93" ["blue"]="94" ["magenta"]="95" ["cyan"]="96" ["white"]="97")
-    printf "\x1b[%sm%s\x1b[0m\n" "${colors[$1]:-0}" "$text"
+    if tput colors &>/dev/null; then
+        printf "\x1b[%sm%s\x1b[0m\n" "${colors[$1]:-0}" "$text"
+    else
+        printf "%s\n" "$text"
+    fi
 }
 
 print_menu() {
@@ -47,36 +51,35 @@ print_menu() {
 task_docker_watch() {
     local compose_file="docker-compose.yaml"
     docker compose -f "$compose_file" down --remove-orphans
-    local tag="$APP_NAME-dev"
-    docker rmi "$tag"
-    docker build --tag "$tag" --target development \
-        --build-arg GO_VERSION="$GO_VERSION" \
-        --build-arg APP_VERSION="$APP_VERSION" \
-        .
-    docker compose -f "$compose_file" up
+    docker compose -f "$compose_file" rm --force
+    docker compose -f "$compose_file" up --build
 }
 
-# Build docker image for production release
+repository="$(echo "$PACKAGE_NAME" | cut -d '/' -f 2-)"
+tag="$APP_VERSION"
+# Build docker image for release
 task_docker_build() {
-    local tag="${1:-"$APP_NAME:$APP_VERSION"}"
-    docker build --tag "$tag" --target production --platform linux/amd64 \
-        --build-arg GO_VERSION="$GO_VERSION" \
-        --build-arg APP_VERSION="$APP_VERSION" \
-        .
+    docker rmi "$repository:$tag" --force || true
+    docker build --tag "$repository:$tag" --target production --platform linux/amd64 --build-arg BASE_IMAGE_TAG="$BASE_IMAGE_TAG" \
+        --cache-from type=registry,ref="$repository" --cache-to type=registry,ref="$repository,mode=max,ignore-error=true" .
+    echo -e "\n➤ Image: $repository:$tag"
 }
 
 # Push production docker image to registry
 task_docker_push() {
-    local tag="${1:-"$APP_NAME:$APP_VERSION"}"
-    local repo_name
-    repo_name=$(echo "$tag" | cut -d ':' -f 1)
-
+    if grep "dirty" <<<"$tag"; then
+        print_colored red "ERROR: Tag is dirty. Please commit changes and re-run task."
+        return 1
+    fi
     docker login --username "$DOCKERHUB_USERNAME" --password "$DOCKERHUB_PASSWORD"
-
-    docker push "${1:-$tag}"
+    docker push "$repository:$tag"
     # Tag and push image as latest
-    docker tag "$tag" "$repo_name:latest"
-    docker push "$repo_name:latest"
+    docker tag "$repository:$tag" "$repository:latest"
+    docker push "$repository:latest"
+    echo \
+        "The following images were pushed to registry:
+    - $repository:$tag
+    - $repository:latest"
 }
 
 # Run live development server
@@ -89,26 +92,25 @@ task_watch() {
 }
 
 readonly build_path="./bin/main"
-
-# Build go app for production release and generate swagger docs
+# Build go app for production release and generate OpenAPI docs
 task_build() {
-    print_colored blue "Building app..."
-    swag init -g internal/handler/router.go
-
     local build_id="$APP_NAME.$APP_VERSION"
-
-    local build_cmd="CGO_ENABLED=0 go build --ldflags=\"-s -w -X $PACKAGE_NAME/internal/config.BuildId=$build_id -extldflags=-static\" \
-        --trimpath --buildmode=pie --pgo default.pgo -o $build_path ."
+    local build_cmd="go generate ./... && CGO_ENABLED=0 go build \
+        -ldflags='-s -w -X $PACKAGE_NAME/internal/config.BuildId=$build_id -extldflags \"-static\"' \
+        --trimpath -o $build_path ."
 
     if ! eval "$build_cmd"; then
         print_colored red "Build failed"
         return 1
     fi
+
+    if file "$build_path" | grep "dynamically linked" >/dev/null; then
+        print_colored red "ERROR: Binary is still dynamically linked."
+        file "$build_path"
+        return 1
+    fi
     print_colored green "Build successful ✔ $(print_colored grey "($build_id)")"
-
 }
-
-echo "$A"
 
 # Run go app build
 task_start() {
@@ -116,7 +118,6 @@ task_start() {
         print_colored red "Build not found."
         return 1
     fi
-    print_colored blue "Starting app..."
     "$build_path"
 }
 
@@ -137,7 +138,6 @@ task_benchmark() {
 
 # Clean go mod & cache & remove build artifacts
 task_clean() {
-    print_colored blue "Cleaning up..."
     go mod tidy -v
     go clean --cache
     rm -rf ./bin ./.tmp
@@ -146,7 +146,6 @@ task_clean() {
 
 # Generate pprof profile
 task_pprof() {
-    print_colored blue "Generating pprof profile..."
     curl "http://localhost:${PORT:-"8080"}/debug/pprof/profile?seconds=30" >default.pgo && print_colored green "Generated pprof profile successfully ✔"
 }
 
@@ -156,29 +155,26 @@ task_checkpoint() {
         print_colored magenta "Quitting..."
         return 1
     fi
-
-    print_colored blue "Creating checkpoint..."
-
     if git add . && git commit -m "Checkpoint at $(date '+%Y-%m-%dT%H:%M:%S%z')" && git push; then
         print_colored green "Created checkpoint and pushed to origin ✔"
         return 0
     fi
-
     print_colored red "Failed to create checkpoint"
 }
 
 # Upgrade dependencies
 task_upgrade_deps() {
-    print_colored blue "Upgrading dependencies..."
     if go get -u ./...; then
-        print_colored green "Upgraded dependencies successfully ✔"
+        print_colored green "Upgraded minor/patch versions of packages successfully ✔"
+        echo "To upgrade major versions, you have to run 'go get -u <package>@<version>' for each package manually"
         return 0
     fi
-    print_colored red "Failed to upgrade dependencies"
+    print_colored red "Failed to upgrade packages"
 }
 
 if [[ -z "$(declare -F "task_$1")" ]]; then
     print_menu
 else
+    echo "➤ Executing task: $*"
     "task_$*"
 fi

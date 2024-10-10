@@ -1,0 +1,7 @@
+bin
+db
+tmp
+.tmp
+*.env*
+.DS_Store
+secrets.json

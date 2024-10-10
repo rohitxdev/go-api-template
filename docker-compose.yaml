@@ -1,9 +1,18 @@
 services:
   api:
-    image: ${APP_NAME}-dev
+    build:
+      context: .
+      target: development
+      args:
+        - BASE_IMAGE_TAG=${BASE_IMAGE_TAG}
     volumes:
       - .:/app
     ports:
-      - 8080:${PORT}
-    env_file:
-      - ${ENV_FILE}
+      - ${PORT}:${PORT}
+    environment:
+      - SECRETS_FILE=/run/secrets/secrets.json
+    secrets:
+      - secrets.json
+secrets:
+  secrets.json:
+    file: secrets.json

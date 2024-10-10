@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/joho/godotenv"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -49,10 +48,6 @@ type Client struct {
 }
 
 func Load() (*Server, error) {
-	if err := godotenv.Load(); err != nil {
-		return nil, fmt.Errorf("could not load env file: %w", err)
-	}
-
 	m := map[string]any{
 		"host": os.Getenv("HOST"),
 		"port": os.Getenv("PORT"),
@@ -126,10 +121,4 @@ func Load() (*Server, error) {
 	}
 
 	return &c, err
-}
-
-func init() {
-	if BuildId == "" {
-		panic("build id is not set")
-	}
 }

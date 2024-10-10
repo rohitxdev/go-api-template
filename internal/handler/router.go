@@ -24,8 +24,6 @@ import (
 	"github.com/rohitxdev/go-api-starter/pkg/repo"
 	echoSwagger "github.com/swaggo/echo-swagger"
 	"golang.org/x/time/rate"
-
-	_ "github.com/rohitxdev/go-api-starter/docs"
 )
 
 // Custom view renderer
@@ -244,6 +242,8 @@ func New(h *handler) (*echo.Echo, error) {
 
 	e.GET("/config", h.GetConfig)
 
+	e.GET("/foo", h.Foo)
+
 	e.GET("/files/:file_name", h.GetFile)
 
 	v1 := e.Group("/v1")
@@ -258,33 +258,4 @@ func New(h *handler) (*echo.Echo, error) {
 	}
 
 	return e, nil
-}
-
-// @Summary Ping
-// @Description Ping the server.
-// @Router /ping [get]
-// @Success 200 {string} string "pong"
-func (h *handler) Ping(c echo.Context) error {
-	return c.String(http.StatusOK, "pong")
-}
-
-// @Summary Admin route
-// @Description Admin route.
-// @Security ApiKeyAuth
-// @Router /_ [get]
-// @Success 200 {string} string "Hello, Admin!"
-// @Failure 401 {string} string "invalid session"
-func (h *handler) AdminRoute(c echo.Context) error {
-	return c.String(http.StatusOK, "Hello, Admin!")
-}
-
-// @Summary Get config
-// @Description Get client config.
-// @Router /config [get]
-// @Success 200 {object} config.Client
-func (h *handler) GetConfig(c echo.Context) error {
-	clientConfig := config.Client{
-		Env: h.config.Env,
-	}
-	return c.JSON(http.StatusOK, clientConfig)
 }

@@ -1,63 +1,49 @@
-# syntax=docker/dockerfile:1
-# https://docs.docker.com/go/dockerfile-reference/
-
-ARG GO_VERSION=1.23
-ARG IMAGE_OS_NAME=alpine
-ARG IMAGE_OS_VERSION=3.20
-
+ARG BASE_IMAGE_TAG
 
 # Development image
-FROM golang:${GO_VERSION} AS development
+FROM golang${BASE_IMAGE_TAG} AS development
 
 WORKDIR /app
 
-RUN go install github.com/air-verse/air@latest && go install github.com/swaggo/swag/cmd/swag@latest
+RUN apk add --no-cache build-base bash git
 
-COPY go.mod go.sum ./
+RUN go install github.com/air-verse/air@latest
 
-RUN go mod download
+RUN --mount=type=bind,source=go.sum,target=go.sum \
+    --mount=type=bind,source=go.mod,target=go.mod \
+    go mod download -x
 
 ENTRYPOINT ["./run","watch"]
 
 
 # Production builder image
-FROM golang:${GO_VERSION}-${IMAGE_OS_NAME}${IMAGE_OS_VERSION} AS builder
+FROM golang${BASE_IMAGE_TAG} AS production-builder
 
 WORKDIR /app
 
-RUN apk add git && apk add bash
+RUN apk add --no-cache build-base bash git
 
-RUN go install github.com/air-verse/air@latest && go install github.com/swaggo/swag/cmd/swag@latest
+RUN go install github.com/swaggo/swag/cmd/swag@latest
 
-COPY go.mod go.sum ./
+ENV GOPATH=/go
 
-RUN go mod download
+RUN --mount=type=bind,source=go.sum,target=go.sum \
+    --mount=type=bind,source=go.mod,target=go.mod \
+    --mount=type=cache,target=/go/pkg/mod \
+    go mod download -x
 
 COPY . .
 
-RUN ./run build
+ENV GOCACHE=/root/.cache/go-build
+
+RUN --mount=type=cache,target="/root/.cache/go-build" ./run build
 
 
-# Production image
-FROM ${IMAGE_OS_NAME}:${IMAGE_OS_VERSION} AS production
+# Final production image
+FROM scratch AS production
 
 WORKDIR /app
 
-COPY --from=builder /app/bin/main ./bin/main
+COPY --from=production-builder /app/bin .
 
-# Create a non-privileged user that the app will run under.
-# See https://docs.docker.com/go/dockerfile-user-best-practices/
-ARG UID=10001
-
-RUN adduser \
-    --disabled-password \
-    --gecos "" \
-    --home "/nonexistent" \
-    --shell "/sbin/nologin" \
-    --no-create-home \
-    --uid "${UID}" \
-    non_root_user
-
-USER non_root_user
-
-ENTRYPOINT ["./bin/main"]
+ENTRYPOINT ["./main"]
