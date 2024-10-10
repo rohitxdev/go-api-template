@@ -2,6 +2,8 @@
 
 set -e
 
+set -o allexport
+
 ENV_FILE="${ENV_FILE:-".env"}"
 # shellcheck disable=SC1090
 [[ -r $ENV_FILE ]] && source "$ENV_FILE"
@@ -12,7 +14,7 @@ APP_VERSION="$(git describe --tags --always --dirty)"
 GO_VERSION=$(awk '/^go/ { print $2 }' go.mod)
 BASE_IMAGE_TAG=":$GO_VERSION-alpine3.20"
 
-export BASE_IMAGE_TAG
+set +o allexport
 
 prompt() {
     read -p "$1 [y/n]: " -s -n 1 -r res
